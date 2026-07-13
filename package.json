@@ -1,0 +1,11 @@
+{
+  "name": "athleteos-taekwondo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --check src/app.js"
+  },
+  "description": "AthleteOS - Taekwondo Edition"
+}
