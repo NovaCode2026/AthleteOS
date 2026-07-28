@@ -1,55 +1,24 @@
 # API
 
-The local server exposes JSON endpoints for browser workflows.
+The production app uses Supabase directly from the browser for authenticated data and Netlify Functions for operations requiring secrets.
 
-## GET `/api/health`
+## POST `/.netlify/functions/ai-coach`
 
-Returns OpenAI configuration status.
-
-```json
-{
-  "configured": true,
-  "model": "gpt-4.1-mini"
-}
-```
-
-## GET `/api/weather?city=New%20Delhi`
-
-Looks up current weather using Open-Meteo.
+Calls OpenAI from a server-only Netlify Function.
 
 ```json
 {
-  "place": "New Delhi, India",
-  "current": {
-    "temperature_2m": 31.2,
-    "apparent_temperature": 34.8,
-    "wind_speed_10m": 8.4
-  }
+  "topic": "Training Coach",
+  "prompt": "Prepare me for a tournament in two weeks."
 }
 ```
 
-## POST `/api/event-scan`
+All OpenAI requests require `OPENAI_API_KEY` in Netlify environment variables.
 
-Analyzes an official event source.
+## Supabase
 
-```json
-{
-  "eventName": "National Taekwondo Championship",
-  "sourceUrl": "https://example.org/event-circular",
-  "sourceText": "Optional pasted official update text"
-}
-```
+Tables and policies are defined in:
 
-The response contains summary, changes, dates, venue, registration, action items, confidence, scan time, and source metadata.
-
-## POST `/api/certificate-scan`
-
-Extracts achievement details from a certificate image data URL.
-
-```json
-{
-  "imageData": "data:image/png;base64,..."
-}
-```
-
-If AI is unavailable, the endpoint returns empty fields with `needsManualReview: true`.
+- `supabase/schema.sql`
+- `supabase/policies.sql`
+- `supabase/storage.sql`

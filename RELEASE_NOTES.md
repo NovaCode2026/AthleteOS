@@ -1,22 +1,21 @@
 # AthleteOS v1.0.0 Release Notes
 
-AthleteOS v1.0.0 is the first production-quality local release of the Taekwondo Edition.
+AthleteOS v1.0.0 upgrades the Taekwondo Edition into a cloud-ready production application.
 
 ## Highlights
 
-- Refined dark desktop-first interface with responsive mobile support.
-- Local-first athlete data model with export and restore controls.
-- AI Event Watch with official-source scan history and fallback extraction.
-- Certificate scanner workflow for reviewable achievement capture.
-- Weather and travel readiness view.
-- Full open-source maintenance kit: README, changelog, roadmap, security policy, contributing guide, templates, and MIT license.
+- React + Vite frontend
+- Supabase Auth, Postgres, Row Level Security, and private Storage
+- Netlify deployment with server-side OpenAI function
+- Protected athlete dashboard and cloud-backed feature screens
+- SQL scripts for schema, RLS policies, and storage buckets
+- Deployment guide for Supabase and Netlify
 
 ## Validation
 
-Run:
-
 ```bash
-npm test
+pnpm install
+pnpm run build
 ```
 
-Then open `http://localhost:4173` after `npm start`.
+The build currently passes. Recharts is isolated in its own vendor chunk; Vite may still warn that the chart chunk is larger than 500 kB because the charting dependency itself is large.

@@ -6,45 +6,9 @@
   <meta name="theme-color" content="#07111f">
   <meta name="description" content="AthleteOS Taekwondo Edition by Nova Code">
   <title>AthleteOS | Taekwondo Edition</title>
-  <link rel="stylesheet" href="src/styles/main.css">
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="sidebar" aria-label="Primary navigation">
-      <a class="skip-link" href="#content">Skip to content</a>
-      <div class="brand" aria-label="AthleteOS by Nova Code">
-        <span class="brand-mark">A</span>
-        <span>Athlete<span>OS</span></span>
-      </div>
-      <p class="edition">Taekwondo Edition</p>
-      <nav id="nav" aria-label="Application sections"></nav>
-      <div class="sidebar-foot">
-        <span class="status-dot" aria-hidden="true"></span> Local-first and secure<br>
-        <small>Nova Code | v1.0.0</small>
-      </div>
-    </aside>
-    <main>
-      <header>
-        <div>
-          <p class="eyebrow" id="section-kicker">Command Center</p>
-          <h1 id="page-title">Good evening, Arjun.</h1>
-        </div>
-        <div class="header-actions">
-          <button class="icon-btn" id="notify" type="button" aria-label="Notifications"><span aria-hidden="true">!</span><i></i></button>
-          <button class="profile" id="profile-chip" type="button" aria-label="Current athlete"><span>AK</span><b>Arjun Kumar</b></button>
-        </div>
-      </header>
-      <section id="content" tabindex="-1"></section>
-      <footer id="app-footer"></footer>
-    </main>
-  </div>
-  <dialog id="modal" aria-label="AthleteOS dialog">
-    <form method="dialog" id="modal-form">
-      <button class="close" value="cancel" aria-label="Close dialog">x</button>
-      <div id="modal-body"></div>
-    </form>
-  </dialog>
-  <div id="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="src/main.js"></script>
+  <div id="root"></div>
+  <script type="module" src="/src/App.jsx"></script>
 </body>
 </html>

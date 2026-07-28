@@ -1,137 +1,130 @@
 # AthleteOS – Taekwondo Edition
 
-<p align="center">
-  <strong>Professional local-first athlete command center by Nova Code</strong><br>
-  Track tournaments, readiness, medals, documents, weight, travel weather, and AI-assisted official-source updates from one polished desktop-style web app.
-</p>
-
-<p align="center">
-  <a href="https://github.com/NovaCode2026/AthleteOS">Repository</a> |
-  <a href="https://github.com/NovaCode2026/AthleteOS/issues">Issues</a> |
-  <a href="https://github.com/NovaCode2026/AthleteOS/discussions">Discussions</a>
-</p>
+AthleteOS is a production-ready cloud application for Taekwondo athletes, built by **Nova Code** with React, Vite, Supabase, Netlify, and secure server-side OpenAI functions.
 
 ## Features
 
-- 🥋 Athlete profile, belt, coach, school, age class, and weight category
-- 🧭 Readiness dashboard with competition countdown and training signals
-- 🤖 AI Event Watch for official-source summaries and change history
-- 🗓️ Calendar for training, weigh-ins, travel, and competition dates
-- 🏅 Medal cabinet with certificate-assisted achievement capture
-- 🔐 Document vault metadata for medical, identity, and registration records
-- ⚖️ Weight tracker with trend visualization
-- ✅ Competition checklist with local persistence
-- 🌦️ Weather and travel readiness powered by Open-Meteo
-- 🔔 Notifications, export, and local sample-data recovery
+- Secure Supabase authentication: register, login, logout, forgot password, reset password, email verification, remembered sessions, and protected routes
+- Supabase-backed athlete profile, tournaments, matches, medals, certificates, documents, weight logs, calendar, notifications, checklists, injuries, and goals
+- Row Level Security so every athlete can only access their own records
+- Secure Supabase Storage buckets for profile images, medal images, certificates, and documents
+- Server-only OpenAI calls through Netlify Functions
+- AI coach workflows for training, tournament preparation, match analysis, nutrition, recovery, goals, reports, and motivation
+- Responsive dark UI for desktop, tablet, and mobile
+- Dashboard with tournaments, training, weight chart, statistics, medals, quick actions, and goals
 
-## Screenshots
-
-Screenshots are organized for release assets:
-
-| View | Capture Target |
-| --- | --- |
-| Dashboard | `docs/screenshots/dashboard.png` |
-| AI Event Watch | `docs/screenshots/event-watch.png` |
-| Medal Cabinet | `docs/screenshots/medal-cabinet.png` |
-| Mobile Layout | `docs/screenshots/mobile.png` |
-
-## Architecture Overview
-
-AthleteOS is a dependency-light Node.js and browser application. The browser owns the local-first experience and persists user data in `localStorage`. The Node server serves static assets and protects server-only integrations such as OpenAI API calls, source fetching, and weather lookups.
+## Architecture
 
 ```text
-Browser UI -> localStorage
-Browser UI -> Node server APIs -> OpenAI Responses API
-Browser UI -> Node server APIs -> Open-Meteo APIs
+React + Vite browser app
+  -> Supabase Auth
+  -> Supabase Postgres with RLS
+  -> Supabase Storage with private bucket policies
+  -> Netlify Functions for OpenAI-only secret operations
 ```
 
-See [docs/Architecture.md](docs/Architecture.md) for the detailed design.
+The browser handles rendering, validation, state, and direct Supabase access through the publishable anon key. Secrets never run in the browser.
 
 ## Requirements
 
-- Node.js 18 or newer
-- A modern Chromium, Edge, Firefox, or Safari browser
-- Optional: `OPENAI_API_KEY` in `.env.local` for live AI summaries
+- Node.js 18+
+- Supabase project
+- Netlify project
+- OpenAI API key configured only in Netlify environment variables
 
-## Installation
+## Environment Variables
+
+Frontend:
 
 ```bash
-git clone https://github.com/NovaCode2026/AthleteOS.git
-cd AthleteOS
-npm install
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
 ```
 
-This project currently has no third-party runtime dependencies, so `npm install` is mainly for standard npm workflow compatibility.
+Server:
+
+```bash
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4.1-mini
+```
+
+Never expose `OPENAI_API_KEY` or any Supabase service-role key in frontend code.
+
+## Install
+
+```bash
+npm install
+```
 
 ## Run Locally
 
 ```bash
-npm start
+npm run dev
 ```
 
-Open `http://localhost:4173`.
-
-To use AI features, create `.env.local`:
+For Netlify Functions locally:
 
 ```bash
-OPENAI_API_KEY=your_api_key_here
-OPENAI_MODEL=gpt-4.1-mini
+netlify dev
 ```
+
+## Build
+
+```bash
+npm run build
+```
+
+## Supabase Setup
+
+Run the SQL files in this order in the Supabase SQL editor:
+
+1. `supabase/schema.sql`
+2. `supabase/policies.sql`
+3. `supabase/storage.sql`
+
+Then enable email auth settings and configure the redirect URL for your Netlify domain.
+
+## Netlify Deployment
+
+1. Connect GitHub repo `NovaCode2026/AthleteOS`.
+2. Set build command: `npm run build`.
+3. Set publish directory: `dist`.
+4. Set functions directory: `netlify/functions`.
+5. Add all environment variables listed above.
+6. Deploy.
 
 ## Folder Structure
 
 ```text
-AthleteOS/
-  .github/              GitHub issue, PR, and discussion templates
-  docs/                 Architecture, API, development, and UI docs
-  public/               Static public assets
-  src/
-    assets/             Icon utilities and visual assets
-    components/         Future component modules
-    data/               Default app data and navigation model
-    styles/             Application stylesheet
-    utils/              DOM, API, and storage helpers
-    main.js             Browser application entrypoint
-  index.html            App shell
-  server.mjs            Local static/API server
+src/
+  App.jsx
+  hooks/useAuth.js
+  lib/supabase.js
+  services/database.js
+  data/seed.js
+  styles/main.css
+netlify/functions/
+  ai-coach.mjs
+supabase/
+  schema.sql
+  policies.sql
+  storage.sql
+docs/
+  API.md
+  Architecture.md
+  Development.md
+  UI.md
 ```
 
-## Technology Stack
+## Manual Steps After Coding
 
-- JavaScript ES modules
-- Node.js HTTP server
-- Browser `localStorage`
-- CSS Grid, Flexbox, and responsive media queries
-- OpenAI Responses API for event and certificate assistance
-- Open-Meteo for weather data
-
-## Current Features
-
-AthleteOS v1.0.0 includes the dashboard, event monitoring, local calendar, medal cabinet, document vault, athlete profile, weight tracker, competition checklist, notifications, data export, certificate scanning workflow, weather endpoint, and travel weather UI.
-
-## Roadmap
-
-See [ROADMAP.md](ROADMAP.md).
-
-## Future Features
-
-- Desktop packaging with Electron or Tauri
-- Optional encrypted local database
-- Cloud sync and multi-device backup
-- OCR fallback for certificate extraction
-- Official federation source adapters
-- Push notifications and offline-first service worker
-
-## Contributing
-
-Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before opening issues or pull requests.
+- Create a Supabase project.
+- Run `schema.sql`, `policies.sql`, and `storage.sql`.
+- Copy Supabase URL and anon key into Netlify and local env files.
+- Add `OPENAI_API_KEY` only to Netlify/local server env.
+- Configure Supabase auth redirect URLs.
+- Deploy on Netlify.
 
 ## License
 
-AthleteOS is released under the [MIT License](LICENSE).
-
-## Developer
-
-Developed by **Nova Code**.
-
-Copyright © 2026 Nova Code.
+MIT License. Copyright (c) 2026 Nova Code.

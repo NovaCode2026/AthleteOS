@@ -1,18 +1,10 @@
 {
   "name": "athleteos-taekwondo",
   "version": "1.0.0",
-  "description": "AthleteOS Taekwondo Edition is a local-first athlete command center for events, medals, documents, weight, readiness, and AI-assisted official-source scanning.",
+  "description": "Production-ready AthleteOS Taekwondo Edition built with React, Vite, Supabase, Netlify, and secure OpenAI functions.",
   "private": false,
   "type": "module",
-  "keywords": [
-    "athleteos",
-    "taekwondo",
-    "sports",
-    "athlete-management",
-    "local-first",
-    "openai",
-    "nova-code"
-  ],
+  "keywords": ["athleteos", "taekwondo", "react", "vite", "supabase", "netlify", "openai", "sports-tech"],
   "author": "Nova Code",
   "license": "MIT",
   "homepage": "https://github.com/NovaCode2026/AthleteOS#readme",
@@ -24,10 +16,23 @@
     "url": "https://github.com/NovaCode2026/AthleteOS/issues"
   },
   "scripts": {
-    "start": "node server.mjs",
-    "dev": "node server.mjs",
-    "check": "node --check server.mjs && node --check src/main.js",
-    "test": "npm run check"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "npm run build",
+    "test": "npm run build"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2",
+    "recharts": "^2.12.7"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.2"
   },
   "engines": {
     "node": ">=18.0.0"

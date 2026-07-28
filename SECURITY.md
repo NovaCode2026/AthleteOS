@@ -17,7 +17,7 @@ Please report security concerns privately before opening a public issue. Include
 
 ## Security Model
 
-AthleteOS is local-first. User data is stored in browser `localStorage`, while API keys must remain server-side in `.env.local`. Never place `OPENAI_API_KEY` or other secrets in client code, screenshots, issue bodies, or commits.
+AthleteOS is cloud-backed through Supabase. User data is protected by Supabase Auth and Row Level Security, while API keys must remain server-side in Netlify environment variables or local ignored env files. Never place `OPENAI_API_KEY`, Supabase service-role keys, or other secrets in client code, screenshots, issue bodies, or commits.
 
 ## Responsible Disclosure
 

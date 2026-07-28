@@ -4,27 +4,28 @@
 
 ```bash
 npm install
-npm start
+npm run dev
 ```
 
-Open `http://localhost:4173`.
+Open `http://localhost:5173`.
 
 ## Checks
 
 ```bash
-npm test
+npm run build
 ```
 
-This validates JavaScript syntax for the server and browser entrypoint.
+This validates the React/Vite production build.
 
 ## Environment
 
 Use `.env.local` for local secrets:
 
 ```bash
-OPENAI_API_KEY=your_api_key
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+OPENAI_API_KEY=your_openai_api_key
 OPENAI_MODEL=gpt-4.1-mini
-PORT=4173
 ```
 
 ## Project Principles

@@ -2,25 +2,25 @@
 
 ## Version 1.0.0
 
-- Local-first Taekwondo athlete operating system
-- AI-assisted official-source monitoring
-- Certificate review workflow
-- Weather and travel readiness panel
-- Professional documentation and GitHub community files
+- React/Vite production app
+- Supabase Authentication
+- Supabase Postgres schema with Row Level Security
+- Private Supabase Storage buckets
+- Netlify OpenAI function
+- Dashboard, profile, tournaments, training, medals, documents, weight tracking, calendar, checklist, goals, and AI coach
 
 ## Near-Term
 
-- Event editing screens
-- Import workflow for AthleteOS backup files
-- Better chart labels and long-term weight trend views
-- Service worker for offline shell caching
-- Screenshot assets for README releases
+- Dedicated edit screens for every record type
+- File upload UI for profile images, medals, certificates, and documents
+- Supabase realtime notifications
+- Import workflow for legacy AthleteOS backups
+- Test suite with component and integration coverage
 
 ## Future
 
-- Electron or Tauri desktop distribution
-- Encrypted local database
-- Optional cloud sync
-- Federation-specific official-source adapters
-- Push notifications
-- Role-based coach and parent views
+- Offline-first caching for recently viewed athlete data
+- Coach and parent views with explicit permission sharing
+- Federation-specific event-source adapters
+- Mobile install prompts and push notifications
+- Advanced performance analytics and season reports
