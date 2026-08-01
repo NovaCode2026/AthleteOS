@@ -21,6 +21,10 @@ create table if not exists public.profiles (
   coach text,
   emergency_contact text,
   achievements text,
+  plan_id text not null default 'free' check (plan_id in ('free','student','pro','champion','academy')),
+  verified_athlete boolean not null default false,
+  founder_badge boolean not null default false,
+  role text not null default 'athlete' check (role in ('athlete','coach','academy_admin','admin')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -169,18 +173,99 @@ create table if not exists public.goals (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.student_verifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  document_type text not null check (document_type in ('school_id','fee_receipt','bonafide')),
+  file_path text,
+  status text not null default 'pending' check (status in ('pending','approved','rejected')),
+  reviewer_notes text,
+  reviewed_by uuid references auth.users(id),
+  reviewed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.feedback_items (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  title text not null,
+  details text,
+  status text not null default 'new' check (status in ('new','reviewing','planned','closed')),
+  priority text not null default 'normal' check (priority in ('low','normal','high')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.roadmap_items (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  description text,
+  status text not null default 'planned' check (status in ('research','planned','in-progress','released')),
+  votes integer not null default 0 check (votes >= 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.ai_usage_events (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  plan_id text not null default 'free',
+  topic text not null,
+  tokens_used integer not null default 0 check (tokens_used >= 0),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null unique references auth.users(id) on delete cascade,
+  plan_id text not null default 'free' check (plan_id in ('free','student','pro','champion','academy')),
+  provider text check (provider in ('manual','razorpay','stripe','cashfree')),
+  provider_customer_id text,
+  provider_subscription_id text,
+  status text not null default 'active' check (status in ('active','trialing','past_due','canceled')),
+  current_period_end timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.referrals (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  code text not null unique,
+  referred_user_id uuid references auth.users(id),
+  status text not null default 'created' check (status in ('created','converted','rewarded')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.athlete_badges (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  badge_key text not null,
+  badge_label text not null,
+  awarded_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  unique (user_id, badge_key)
+);
+
 create index if not exists idx_training_sessions_user_date on public.training_sessions(user_id, session_date desc);
 create index if not exists idx_tournaments_user_date on public.tournaments(user_id, starts_at);
 create index if not exists idx_weight_logs_user_date on public.weight_logs(user_id, logged_at);
 create index if not exists idx_calendar_events_user_date on public.calendar_events(user_id, event_date);
 create index if not exists idx_notifications_user_read on public.notifications(user_id, read_at);
+create index if not exists idx_student_verifications_user_status on public.student_verifications(user_id, status);
+create index if not exists idx_feedback_items_user_status on public.feedback_items(user_id, status);
+create index if not exists idx_roadmap_items_status_votes on public.roadmap_items(status, votes desc);
+create index if not exists idx_ai_usage_events_user_created on public.ai_usage_events(user_id, created_at desc);
 
 do $$
 declare table_name text;
 begin
   foreach table_name in array array[
     'profiles','training_sessions','tournaments','matches','medals','certificates','documents',
-    'weight_logs','calendar_events','notifications','competition_checklists','injuries','goals'
+    'weight_logs','calendar_events','notifications','competition_checklists','injuries','goals',
+    'student_verifications','feedback_items','roadmap_items','subscriptions','referrals'
   ] loop
     execute format('drop trigger if exists set_%s_updated_at on public.%I', table_name, table_name);
     execute format('create trigger set_%s_updated_at before update on public.%I for each row execute function public.set_updated_at()', table_name, table_name);

@@ -1,10 +1,10 @@
 {
   "name": "athleteos-taekwondo",
-  "version": "1.0.0",
-  "description": "Production-ready AthleteOS Taekwondo Edition built with React, Vite, Supabase, Netlify, and secure OpenAI functions.",
+  "version": "2.0.0",
+  "description": "Production-ready AthleteOS V2 Taekwondo Edition with React, TypeScript, Supabase, Netlify, and secure OpenAI coaching.",
   "private": false,
   "type": "module",
-  "keywords": ["athleteos", "taekwondo", "react", "vite", "supabase", "netlify", "openai", "sports-tech"],
+  "keywords": ["athleteos", "taekwondo", "react", "typescript", "vite", "supabase", "netlify", "openai", "sports-tech"],
   "author": "Nova Code",
   "license": "MIT",
   "homepage": "https://github.com/NovaCode2026/AthleteOS#readme",

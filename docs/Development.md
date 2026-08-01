@@ -17,6 +17,8 @@ npm run build
 
 This validates the React/Vite production build.
 
+The primary app entrypoint is `src/App.tsx`. Vite transpiles TSX during development and production builds.
+
 ## Environment
 
 Use `.env.local` for local secrets:
@@ -34,4 +36,4 @@ OPENAI_MODEL=gpt-4.1-mini
 - Keep UI workflows local-first.
 - Prefer explicit state updates and small helper modules.
 - Preserve accessible labels and keyboard behavior when adding controls.
-- Do not introduce build tooling until it solves a real product need.
+- Keep Supabase table changes mirrored in `schema.sql` and `policies.sql`.

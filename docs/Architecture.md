@@ -1,18 +1,19 @@
 # Architecture
 
-AthleteOS is a React/Vite cloud application backed by Supabase and deployed on Netlify.
+AthleteOS is a React/TypeScript/Vite cloud application backed by Supabase and deployed on Netlify.
 
 ## Layers
 
 - **Application shell:** `index.html` mounts the Vite React app.
-- **Browser app:** `src/App.jsx` renders protected routes, dashboard, and feature screens.
-- **Auth:** `src/hooks/useAuth.js` manages Supabase authentication and session persistence.
-- **Data access:** `src/services/database.js` centralizes Supabase table and storage operations.
+- **Browser app:** `src/App.tsx` renders protected routes, dashboard, plans, verification, feedback, roadmap, admin, and athlete feature screens.
+- **Auth:** `src/hooks/useAuth.tsx` manages Supabase authentication, email verification state, and session persistence.
+- **Data access:** `src/services/database.ts` centralizes Supabase table and storage operations.
+- **Plans:** `src/config/plans.ts` defines Free, Student, Pro, Champion, and Academy tiers.
 - **Server-only AI:** `netlify/functions/ai-coach.mjs` calls OpenAI without exposing secrets.
 
 ## Data Persistence
 
-Athlete data is stored in Supabase Postgres with Row Level Security. Files are stored in private Supabase Storage buckets.
+Athlete data is stored in Supabase Postgres with Row Level Security. V2 adds normalized tables for student verifications, feedback, public roadmap items, AI usage events, subscriptions, referrals, and badges. Files are stored in private Supabase Storage buckets.
 
 ## AI Boundary
 

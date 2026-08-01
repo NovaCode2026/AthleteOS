@@ -1,38 +1,41 @@
-# AthleteOS – Taekwondo Edition
+# AthleteOS - Taekwondo Edition V2
 
-AthleteOS is a production-ready cloud application for Taekwondo athletes, built by **Nova Code** with React, Vite, Supabase, Netlify, and secure server-side OpenAI functions.
+**AthleteOS** is a production-ready cloud operating system for Taekwondo athletes, built by **Nova Code** with React, TypeScript, Vite, Supabase, Netlify, and secure server-side OpenAI coaching.
 
 ## Features
 
-- Secure Supabase authentication: register, login, logout, forgot password, reset password, email verification, remembered sessions, and protected routes
-- Supabase-backed athlete profile, tournaments, matches, medals, certificates, documents, weight logs, calendar, notifications, checklists, injuries, and goals
-- Row Level Security so every athlete can only access their own records
-- Secure Supabase Storage buckets for profile images, medal images, certificates, and documents
-- Server-only OpenAI calls through Netlify Functions
-- AI coach workflows for training, tournament preparation, match analysis, nutrition, recovery, goals, reports, and motivation
-- Responsive dark UI for desktop, tablet, and mobile
-- Dashboard with tournaments, training, weight chart, statistics, medals, quick actions, and goals
+- Secure Supabase authentication: registration, login, logout, email verification, password reset, remembered sessions, and protected routes
+- TypeScript V2 app shell with typed plans, athlete data, verification, feedback, roadmap, and usage models
+- Supabase-backed athlete profile, tournaments, matches, medals, certificates, documents, weight logs, calendar, notifications, checklists, injuries, goals, feedback, verifications, subscriptions, referrals, badges, and AI usage events
+- Row Level Security so athlete-owned records stay private by default
+- Student verification workflow for school ID, fee receipt, and bonafide proof
+- Plan system: Free, Student, Pro, Champion, and Academy with monthly AI limits
+- AI Coach through Netlify Functions so `OPENAI_API_KEY` never ships to the browser
+- Payment-provider scaffold for Razorpay, Stripe, and Cashfree
+- Admin command-center foundation for users, plans, verifications, feedback, roadmap, badges, AI usage, and analytics
+- Responsive Nova Code branded UI for desktop, tablet, and mobile
 
 ## Architecture
 
 ```text
-React + Vite browser app
+React + TypeScript + Vite browser app
   -> Supabase Auth
   -> Supabase Postgres with RLS
-  -> Supabase Storage with private bucket policies
-  -> Netlify Functions for OpenAI-only secret operations
+  -> Supabase Storage private buckets
+  -> Netlify Functions for secret server operations
+  -> OpenAI Responses API for AI Coach
 ```
 
-The browser handles rendering, validation, state, and direct Supabase access through the publishable anon key. Secrets never run in the browser.
+The browser uses only Supabase publishable anon credentials. OpenAI keys, payment secrets, and future webhook secrets belong only in Netlify/server environments.
 
 ## Requirements
 
 - Node.js 18+
 - Supabase project
 - Netlify project
-- OpenAI API key configured only in Netlify environment variables
+- OpenAI API key configured only in server environment variables
 
-## Environment Variables
+## Environment variables
 
 Frontend:
 
@@ -56,7 +59,7 @@ Never expose `OPENAI_API_KEY` or any Supabase service-role key in frontend code.
 npm install
 ```
 
-## Run Locally
+## Run locally
 
 ```bash
 npm run dev
@@ -74,7 +77,7 @@ netlify dev
 npm run build
 ```
 
-## Supabase Setup
+## Supabase setup
 
 Run the SQL files in this order in the Supabase SQL editor:
 
@@ -82,27 +85,29 @@ Run the SQL files in this order in the Supabase SQL editor:
 2. `supabase/policies.sql`
 3. `supabase/storage.sql`
 
-Then enable email auth settings and configure the redirect URL for your Netlify domain.
+Then enable email auth and configure redirect URLs for local development and the Netlify production domain.
 
-## Netlify Deployment
+## Netlify deployment
 
 1. Connect GitHub repo `NovaCode2026/AthleteOS`.
 2. Set build command: `npm run build`.
 3. Set publish directory: `dist`.
 4. Set functions directory: `netlify/functions`.
-5. Add all environment variables listed above.
+5. Add environment variables.
 6. Deploy.
 
-## Folder Structure
+## Folder structure
 
 ```text
 src/
-  App.jsx
-  hooks/useAuth.js
-  lib/supabase.js
-  services/database.js
+  App.tsx
+  config/plans.ts
+  hooks/useAuth.tsx
+  lib/supabase.ts
+  services/database.ts
   data/seed.js
   styles/main.css
+  types.ts
 netlify/functions/
   ai-coach.mjs
 supabase/
@@ -112,19 +117,43 @@ supabase/
 docs/
   API.md
   Architecture.md
+  Deployment.md
   Development.md
   UI.md
 ```
 
-## Manual Steps After Coding
+## Current V2 modules
 
-- Create a Supabase project.
-- Run `schema.sql`, `policies.sql`, and `storage.sql`.
-- Copy Supabase URL and anon key into Netlify and local env files.
-- Add `OPENAI_API_KEY` only to Netlify/local server env.
-- Configure Supabase auth redirect URLs.
-- Deploy on Netlify.
+- Dashboard
+- Athlete profile
+- Plans and billing scaffold
+- Student verification
+- Tournaments
+- Training
+- Medals
+- Secure documents
+- Weight tracking
+- Competition checklist
+- AI Coach with plan-aware limits
+- Feedback portal
+- Public roadmap
+- Admin command-center foundation
+
+## Roadmap
+
+- Server-enforced AI quota writes in Netlify Functions
+- Payment checkout endpoints for Razorpay, Stripe, and Cashfree
+- File upload UI for verification and certificates
+- Athlete Resume PDF generator
+- Academy roster management
+- Realtime notifications and analytics
 
 ## License
 
 MIT License. Copyright (c) 2026 Nova Code.
+
+## Developer
+
+Built and maintained by **Nova Code**.
+
+GitHub: [NovaCode2026/AthleteOS](https://github.com/NovaCode2026/AthleteOS)

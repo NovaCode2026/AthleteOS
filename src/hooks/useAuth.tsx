@@ -1,10 +1,34 @@
+import type { ReactNode } from "react";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { requireSupabase, supabase } from "../lib/supabase.js";
+import type { Session, User } from "@supabase/supabase-js";
+import { requireSupabase, supabase } from "../lib/supabase";
 
-const AuthContext = createContext(null);
+interface Credentials {
+  email: string;
+  password: string;
+}
 
-export function AuthProvider({ children }) {
-  const [session, setSession] = useState(null);
+interface SignUpCredentials extends Credentials {
+  metadata?: Record<string, string>;
+}
+
+interface AuthContextValue {
+  session: Session | null;
+  user: User | null;
+  loading: boolean;
+  configured: boolean;
+  emailVerified: boolean;
+  signUp: (credentials: SignUpCredentials) => Promise<void>;
+  signIn: (credentials: Credentials) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
+  signOut: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -26,16 +50,20 @@ export function AuthProvider({ children }) {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  const value = useMemo(() => ({
+  const value = useMemo<AuthContextValue>(() => ({
     session,
     user: session?.user ?? null,
     loading,
     configured: Boolean(supabase),
+    emailVerified: Boolean(session?.user.email_confirmed_at),
     async signUp({ email, password, metadata }) {
       const { error } = await requireSupabase().auth.signUp({
         email,
         password,
-        options: { data: metadata }
+        options: {
+          data: metadata,
+          emailRedirectTo: window.location.origin
+        }
       });
       if (error) throw error;
     },
