@@ -161,3 +161,6 @@ MIT License. Copyright (c) 2026 Nova Code.
 Built and maintained by **Nova Code**.
 
 GitHub: [NovaCode2026/AthleteOS](https://github.com/NovaCode2026/AthleteOS)
+
+
+Currently under development 
