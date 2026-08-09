@@ -2,7 +2,11 @@ import { requireSupabase } from "../lib/supabase";
 
 export const TABLES = {
   profile: "profiles",
+  academies: "academies",
+  academyMemberships: "academy_memberships",
   training: "training_sessions",
+  trainingPlans: "training_plans",
+  attendance: "attendance_records",
   tournaments: "tournaments",
   matches: "matches",
   medals: "medals",
@@ -20,7 +24,13 @@ export const TABLES = {
   referrals: "referrals",
   badges: "athlete_badges",
   aiUsage: "ai_usage_events",
-  subscriptions: "subscriptions"
+  subscriptions: "subscriptions",
+  subscriptionUsage: "subscription_usage",
+  paymentEvents: "payment_events",
+  supportTickets: "support_tickets",
+  announcements: "announcements",
+  featureFlags: "feature_flags",
+  auditLogs: "audit_logs"
 } as const;
 
 export type Resource = keyof typeof TABLES;

@@ -4,6 +4,14 @@ All notable changes to AthleteOS are documented here.
 
 ## [2.0.0] - 2026-08-01
 
+### Added - SRS alignment
+
+- Academy, academy membership, training plan, and attendance schema foundations.
+- Subscription usage and payment event tables for plan metering and billing audit trails.
+- Support ticket, announcement, feature flag, and audit log tables for administrative operations.
+- Expanded RLS helpers for support admin, admin, and super admin roles.
+- Private `academy-media` storage bucket for future academy assets.
+
 ### Added
 
 - TypeScript V2 application shell with typed domain models for plans, verification, usage, feedback, roadmap, and athlete records.

@@ -306,7 +306,7 @@ function AdminPage({ data }: { data: CloudData }) {
     </section>
     <section className="card panel">
       <h3>Operational controls</h3>
-      <p>Admin tables and RLS foundations are ready for review queues, plan management, feedback triage, badge awards, and analytics. Grant admin role in `profiles.role` to unlock policy-scoped admin dashboards.</p>
+      <p>Admin tables and RLS foundations are ready for review queues, plan management, feedback triage, badge awards, support tickets, announcements, feature flags, audit logs, academy management, and analytics. Grant `support_admin`, `admin`, or `super_admin` in `profiles.role` to unlock policy-scoped operations.</p>
     </section>
   </FeaturePage>;
 }

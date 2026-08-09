@@ -9,6 +9,7 @@ AthleteOS v2.0.0 upgrades the Taekwondo Edition into a typed, plan-aware, verifi
 - Student verification workflow foundation
 - Plan tiers with AI usage limits
 - Feedback, roadmap, admin, referrals, badges, subscriptions, and AI usage schema
+- Academy, coach, attendance, support, announcement, feature-flag, payment-event, and audit-log schema foundations
 - Netlify deployment with server-side OpenAI function
 - Payment scaffold for Razorpay, Stripe, and Cashfree
 

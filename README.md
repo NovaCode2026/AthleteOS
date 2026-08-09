@@ -6,13 +6,13 @@
 
 - Secure Supabase authentication: registration, login, logout, email verification, password reset, remembered sessions, and protected routes
 - TypeScript V2 app shell with typed plans, athlete data, verification, feedback, roadmap, and usage models
-- Supabase-backed athlete profile, tournaments, matches, medals, certificates, documents, weight logs, calendar, notifications, checklists, injuries, goals, feedback, verifications, subscriptions, referrals, badges, and AI usage events
+- Supabase-backed athlete profile, academies, academy memberships, training plans, attendance, tournaments, matches, medals, certificates, documents, weight logs, calendar, notifications, checklists, injuries, goals, feedback, verifications, subscriptions, referrals, badges, support tickets, announcements, feature flags, audit logs, and AI usage events
 - Row Level Security so athlete-owned records stay private by default
 - Student verification workflow for school ID, fee receipt, and bonafide proof
 - Plan system: Free, Student, Pro, Champion, and Academy with monthly AI limits
 - AI Coach through Netlify Functions so `OPENAI_API_KEY` never ships to the browser
 - Payment-provider scaffold for Razorpay, Stripe, and Cashfree
-- Admin command-center foundation for users, plans, verifications, feedback, roadmap, badges, AI usage, and analytics
+- Admin command-center foundation for users, plans, verifications, feedback, roadmap, badges, support tickets, announcements, feature flags, audit logs, AI usage, academy operations, and analytics
 - Responsive Nova Code branded UI for desktop, tablet, and mobile
 
 ## Architecture
@@ -128,6 +128,7 @@ docs/
 - Athlete profile
 - Plans and billing scaffold
 - Student verification
+- Academy/coach backend foundation
 - Tournaments
 - Training
 - Medals
@@ -138,6 +139,7 @@ docs/
 - Feedback portal
 - Public roadmap
 - Admin command-center foundation
+- Support, announcements, feature flags, and audit-log foundations
 
 ## Roadmap
 
@@ -146,6 +148,8 @@ docs/
 - File upload UI for verification and certificates
 - Athlete Resume PDF generator
 - Academy roster management
+- Coach dashboards, attendance, and training plans
+- Support/admin operations and audit reporting
 - Realtime notifications and analytics
 
 ## License

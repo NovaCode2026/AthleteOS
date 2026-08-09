@@ -4,7 +4,8 @@ values
   ('medal-images', 'medal-images', false),
   ('certificates', 'certificates', false),
   ('documents', 'documents', false),
-  ('verification-proofs', 'verification-proofs', false)
+  ('verification-proofs', 'verification-proofs', false),
+  ('academy-media', 'academy-media', false)
 on conflict (id) do update set public = excluded.public;
 
 create policy "Users can upload own profile images"
@@ -34,3 +35,8 @@ create policy "Users can manage own verification proofs"
 on storage.objects for all
 using (bucket_id = 'verification-proofs' and auth.uid()::text = (storage.foldername(name))[1])
 with check (bucket_id = 'verification-proofs' and auth.uid()::text = (storage.foldername(name))[1]);
+
+create policy "Users can manage own academy media"
+on storage.objects for all
+using (bucket_id = 'academy-media' and auth.uid()::text = (storage.foldername(name))[1])
+with check (bucket_id = 'academy-media' and auth.uid()::text = (storage.foldername(name))[1]);

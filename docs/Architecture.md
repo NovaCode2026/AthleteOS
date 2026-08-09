@@ -13,7 +13,11 @@ AthleteOS is a React/TypeScript/Vite cloud application backed by Supabase and de
 
 ## Data Persistence
 
-Athlete data is stored in Supabase Postgres with Row Level Security. V2 adds normalized tables for student verifications, feedback, public roadmap items, AI usage events, subscriptions, referrals, and badges. Files are stored in private Supabase Storage buckets.
+Athlete data is stored in Supabase Postgres with Row Level Security. V2 adds normalized tables for student verifications, feedback, public roadmap items, AI usage events, subscriptions, referrals, badges, academy memberships, training plans, attendance, support tickets, announcements, feature flags, payment events, and audit logs. Files are stored in private Supabase Storage buckets.
+
+## Role Model
+
+AthleteOS supports athlete, coach, academy admin, support admin, admin, and super admin roles. The UI hides unavailable actions, while database RLS and future Netlify Functions enforce backend authorization.
 
 ## AI Boundary
 
