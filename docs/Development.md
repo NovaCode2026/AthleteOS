@@ -30,6 +30,8 @@ OPENAI_API_KEY=your_openai_api_key
 OPENAI_MODEL=gpt-4.1-mini
 ```
 
+Local `.env.local` is not available to Netlify production builds. Configure the same public Supabase variable names in Netlify, and keep private OpenAI/payment/Supabase service-role secrets server-only.
+
 ## Project Principles
 
 - Keep secrets server-side.

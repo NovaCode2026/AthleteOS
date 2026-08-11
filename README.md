@@ -53,6 +53,8 @@ OPENAI_MODEL=gpt-4.1-mini
 
 Never expose `OPENAI_API_KEY` or any Supabase service-role key in frontend code.
 
+For Netlify production, `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` must be configured in the Netlify site environment before building. Vite embeds `VITE_` variables at build time; production does not read your local `.env.local`.
+
 ## Install
 
 ```bash
@@ -105,7 +107,6 @@ src/
   hooks/useAuth.tsx
   lib/supabase.ts
   services/database.ts
-  data/seed.js
   styles/main.css
   types.ts
 netlify/functions/

@@ -29,7 +29,9 @@ OPENAI_API_KEY
 OPENAI_MODEL
 ```
 
-Do not add Supabase service-role keys to the frontend.
+Only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are frontend-exposed. Do not prefix private values such as `OPENAI_API_KEY`, Supabase service-role keys, payment secrets, or webhook secrets with `VITE_`.
+
+Vite embeds frontend variables at build time. If Netlify is missing `VITE_SUPABASE_URL` or `VITE_SUPABASE_ANON_KEY`, registration and authenticated data loading cannot reach Supabase in production even if local `.env.local` exists.
 
 ## Verification
 

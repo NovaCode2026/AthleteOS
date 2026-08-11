@@ -5,9 +5,9 @@ export const plans: Plan[] = [
     id: "free",
     name: "Free",
     price: "₹0",
-    aiLimit: 10,
+    aiLimit: 0,
     audience: "New athletes",
-    features: ["Core dashboard", "Training and medals", "Secure documents", "Basic AI trial"]
+    features: ["Core dashboard", "Training and medals", "Secure documents", "No AI Coach access"]
   },
   {
     id: "student",
