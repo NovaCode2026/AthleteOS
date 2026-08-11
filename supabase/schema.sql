@@ -289,7 +289,7 @@ create table if not exists public.subscription_usage (
   subscription_id uuid references public.subscriptions(id) on delete cascade,
   usage_month date not null,
   ai_requests_used integer not null default 0 check (ai_requests_used >= 0),
-  ai_requests_limit integer not null default 10 check (ai_requests_limit >= 0),
+  ai_requests_limit integer not null default 0 check (ai_requests_limit >= 0),
   storage_mb_used integer not null default 0 check (storage_mb_used >= 0),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),

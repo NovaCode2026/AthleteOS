@@ -44,6 +44,36 @@ returns boolean language sql stable security definer set search_path = public as
   );
 $$;
 
+create or replace function public.enforce_profile_entitlement_security()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' and not public.is_platform_admin() then
+    new.role = 'athlete';
+    new.plan_id = 'free';
+    new.verified_athlete = false;
+    new.founder_badge = false;
+  end if;
+
+  if tg_op = 'UPDATE' and not public.is_platform_admin() then
+    new.role = old.role;
+    new.plan_id = old.plan_id;
+    new.verified_athlete = old.verified_athlete;
+    new.founder_badge = old.founder_badge;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists enforce_profile_entitlement_security on public.profiles;
+create trigger enforce_profile_entitlement_security
+before insert or update on public.profiles
+for each row execute function public.enforce_profile_entitlement_security();
+
 do $$
 declare table_name text;
 begin
@@ -58,12 +88,34 @@ begin
     execute format('drop policy if exists "%s update own rows" on public.%I', table_name, table_name);
     execute format('drop policy if exists "%s delete own rows" on public.%I', table_name, table_name);
 
-    execute format('create policy "%s select own rows" on public.%I for select using (public.owns_row(user_id))', table_name, table_name);
-    execute format('create policy "%s insert own rows" on public.%I for insert with check (public.owns_row(user_id))', table_name, table_name);
-    execute format('create policy "%s update own rows" on public.%I for update using (public.owns_row(user_id)) with check (public.owns_row(user_id))', table_name, table_name);
-    execute format('create policy "%s delete own rows" on public.%I for delete using (public.owns_row(user_id))', table_name, table_name);
+    execute format('create policy "%s select own rows" on public.%I for select using (public.owns_row(user_id) or public.is_platform_admin())', table_name, table_name);
+    execute format('create policy "%s insert own rows" on public.%I for insert with check (public.owns_row(user_id) or public.is_platform_admin())', table_name, table_name);
+    execute format('create policy "%s update own rows" on public.%I for update using (public.owns_row(user_id) or public.is_platform_admin()) with check (public.owns_row(user_id) or public.is_platform_admin())', table_name, table_name);
+    execute format('create policy "%s delete own rows" on public.%I for delete using (public.owns_row(user_id) or public.is_platform_admin())', table_name, table_name);
   end loop;
 end $$;
+
+drop policy if exists "profiles select own rows" on public.profiles;
+drop policy if exists "profiles insert own rows" on public.profiles;
+drop policy if exists "profiles update own rows" on public.profiles;
+drop policy if exists "profiles delete own rows" on public.profiles;
+drop policy if exists "profiles read own or admin" on public.profiles;
+drop policy if exists "profiles insert own profile" on public.profiles;
+drop policy if exists "profiles update own or admin" on public.profiles;
+drop policy if exists "profiles delete own or admin" on public.profiles;
+
+create policy "profiles read own or admin" on public.profiles
+for select using (public.owns_row(user_id) or public.is_platform_admin());
+
+create policy "profiles insert own profile" on public.profiles
+for insert with check (public.owns_row(user_id));
+
+create policy "profiles update own or admin" on public.profiles
+for update using (public.owns_row(user_id) or public.is_platform_admin())
+with check (public.owns_row(user_id) or public.is_platform_admin());
+
+create policy "profiles delete own or admin" on public.profiles
+for delete using (public.owns_row(user_id) or public.is_platform_admin());
 
 drop policy if exists "roadmap public read" on public.roadmap_items;
 create policy "roadmap public read" on public.roadmap_items for select using (true);

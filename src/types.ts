@@ -124,6 +124,33 @@ export interface UsageSummary {
   plan: Plan;
 }
 
+export interface AiUsageEvent {
+  id?: string;
+  user_id?: string;
+  plan_id?: PlanId;
+  topic: string;
+  tokens_used?: number;
+  created_at?: string;
+}
+
+export interface Subscription {
+  id?: string;
+  user_id?: string;
+  plan_id: PlanId;
+  provider?: "manual" | "razorpay" | "stripe" | "cashfree";
+  status: "active" | "trialing" | "past_due" | "canceled";
+  current_period_end?: string;
+}
+
+export interface SubscriptionUsage {
+  id?: string;
+  user_id?: string;
+  usage_month: string;
+  ai_requests_used: number;
+  ai_requests_limit: number;
+  storage_mb_used?: number;
+}
+
 export interface CloudData {
   profile: Profile;
   tournaments: Tournament[];
@@ -137,4 +164,7 @@ export interface CloudData {
   feedback: FeedbackItem[];
   verifications: VerificationRequest[];
   roadmap: RoadmapItem[];
+  aiUsage: AiUsageEvent[];
+  subscriptions: Subscription[];
+  subscriptionUsage: SubscriptionUsage[];
 }

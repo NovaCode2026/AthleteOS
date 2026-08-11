@@ -8,18 +8,20 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
-import { isSupabaseConfigured } from "./lib/supabase";
+import { isSupabaseConfigured, supabaseConfig } from "./lib/supabase";
 import { deleteRow, insertRow, listRows, upsertRow, type Resource } from "./services/database";
 import { plans, getPlan } from "./config/plans";
-import { seed } from "./data/seed";
 import type {
   ChecklistItem, CloudData, DocumentRecord, FeedbackItem, Goal, Medal as MedalRecord,
-  Profile, RoadmapItem, TrainingSession, Tournament, UsageSummary, VerificationRequest, WeightLog
+  AiUsageEvent, Profile, RoadmapItem, Subscription, SubscriptionUsage, TrainingSession, Tournament, UsageSummary, VerificationRequest, WeightLog
 } from "./types";
 import "./styles/main.css";
 
 type PageId = "dashboard" | "profile" | "plans" | "verification" | "tournaments" | "training" | "medals" | "documents" | "weight" | "calendar" | "checklist" | "ai" | "feedback" | "roadmap" | "admin";
 type ToastState = { type: "success" | "error" | "warning"; message: string } | null;
+type AdminRole = "support_admin" | "admin" | "super_admin";
+
+const adminRoles = new Set<AdminRole>(["support_admin", "admin", "super_admin"]);
 
 const nav: Array<[PageId, string, typeof Activity]> = [
   ["dashboard", "Dashboard", Activity],
@@ -37,6 +39,10 @@ const nav: Array<[PageId, string, typeof Activity]> = [
   ["roadmap", "Roadmap", Target],
   ["admin", "Admin", Gauge]
 ];
+
+function isAdminProfile(profile: Profile) {
+  return adminRoles.has(profile.role as AdminRole);
+}
 
 const fallbackRoadmap: RoadmapItem[] = [
   { title: "Athlete Resume PDF", description: "Generate a polished verified athlete resume from profile, medals, and certificates.", status: "planned", votes: 24 },
@@ -84,9 +90,11 @@ function AuthScreen() {
   }
 
   if (!auth.configured) {
+    const configurationIssues = supabaseConfig.missing.concat(supabaseConfig.invalid);
     return <main className="auth-page"><section className="auth-card">
       <h1>AthleteOS</h1>
-      <p>Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to run the cloud app.</p>
+      <p>Supabase is not configured. Add the required public Vite variables to run the cloud app.</p>
+      {configurationIssues.length > 0 && <p className="notice" role="status">Missing or invalid: {configurationIssues.join(", ")}</p>}
     </section></main>;
   }
 
@@ -128,7 +136,7 @@ function DataTable<T extends { id?: string }>({ rows, columns, empty }: {
 
 function useCloudData(userId: string | undefined, setToast: (toast: ToastState) => void) {
   const [data, setData] = useState<CloudData>({
-    profile: seed.profile as Profile,
+    profile: {},
     tournaments: [],
     training: [],
     medals: [],
@@ -139,15 +147,19 @@ function useCloudData(userId: string | undefined, setToast: (toast: ToastState) 
     notifications: [],
     feedback: [],
     verifications: [],
-    roadmap: fallbackRoadmap
+    roadmap: fallbackRoadmap,
+    aiUsage: [],
+    subscriptions: [],
+    subscriptionUsage: []
   });
+  const [hasProfile, setHasProfile] = useState(false);
   const [loading, setLoading] = useState(true);
 
   async function refresh() {
     if (!userId || !isSupabaseConfigured) return;
     setLoading(true);
     try {
-      const [profiles, tournaments, training, medals, weights, goals, checklist, documents, notifications, feedback, verifications, roadmap] = await Promise.all([
+      const [profiles, tournaments, training, medals, weights, goals, checklist, documents, notifications, feedback, verifications, roadmap, aiUsage, subscriptions, subscriptionUsage] = await Promise.all([
         listRows<Profile>("profile", userId),
         listRows<Tournament>("tournaments", userId, { order: "starts_at", ascending: true }),
         listRows<TrainingSession>("training", userId, { order: "session_date", ascending: false }),
@@ -159,31 +171,41 @@ function useCloudData(userId: string | undefined, setToast: (toast: ToastState) 
         listRows<{ id?: string; title: string; body?: string; read_at?: string }>("notifications", userId, { order: "created_at" }),
         listRows<FeedbackItem>("feedback", userId, { order: "created_at" }),
         listRows<VerificationRequest>("verifications", userId, { order: "created_at" }),
-        listRows<RoadmapItem>("roadmap", undefined, { order: "votes", publicRows: true })
+        listRows<RoadmapItem>("roadmap", undefined, { order: "votes", publicRows: true }),
+        listRows<AiUsageEvent>("aiUsage", userId, { order: "created_at" }),
+        listRows<Subscription>("subscriptions", userId, { order: "created_at" }),
+        listRows<SubscriptionUsage>("subscriptionUsage", userId, { order: "usage_month" })
       ]);
+      const savedProfile = profiles[0];
+      const profileComplete = Boolean(savedProfile?.full_name?.trim());
+      const profile = savedProfile || { user_id: userId, plan_id: "free", role: "athlete" };
+      setHasProfile(profileComplete);
       setData({
-        profile: profiles[0] || { ...(seed.profile as Profile), user_id: userId, plan_id: "free", role: "athlete" },
-        tournaments: tournaments.length ? tournaments : seed.tournaments as Tournament[],
-        training: training.length ? training : seed.training as TrainingSession[],
-        medals: medals.length ? medals : seed.medals as MedalRecord[],
-        weights: weights.length ? weights : seed.weights as WeightLog[],
-        goals: goals.length ? goals : seed.goals as Goal[],
-        checklist: checklist.length ? checklist : seed.checklist as ChecklistItem[],
+        profile,
+        tournaments,
+        training,
+        medals,
+        weights,
+        goals,
+        checklist,
         documents,
         notifications,
         feedback,
         verifications,
-        roadmap: roadmap.length ? roadmap : fallbackRoadmap
+        roadmap: roadmap.length ? roadmap : fallbackRoadmap,
+        aiUsage,
+        subscriptions,
+        subscriptionUsage
       });
     } catch (error) {
-      setToast({ type: "error", message: error instanceof Error ? error.message : "Unable to load AthleteOS data." });
+      setToast({ type: "error", message: error instanceof Error ? error.message : "Unable to load AthleteOS data from Supabase." });
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => { void refresh(); }, [userId]);
-  return { data, loading, refresh };
+  return { data, loading, refresh, hasProfile };
 }
 
 function FeaturePage({ title, actions, children }: { title: string; actions?: React.ReactNode; children: React.ReactNode }) {
@@ -215,12 +237,17 @@ function Dashboard({ data, usage, openForm }: { data: CloudData; usage: UsageSum
   </>;
 }
 
-function PlansPage({ profile, saveProfile }: { profile: Profile; saveProfile: (values: Partial<Profile>) => Promise<void> }) {
-  const currentPlan = getPlan(profile.plan_id);
-  return <FeaturePage title="Plans and billing scaffold">
+function PlansPage({ profile, subscriptions }: { profile: Profile; subscriptions: Subscription[] }) {
+  const activeSubscription = subscriptions.find((item) => ["active", "trialing"].includes(item.status));
+  const entitlementPlanId = activeSubscription?.plan_id || profile.plan_id || "free";
+  const currentPlan = getPlan(entitlementPlanId);
+  return <FeaturePage title="Plans and billing">
     <section className="card panel billing-note">
       <CreditCard />
-      <div><h3>Payment providers ready for integration</h3><p>Razorpay, Stripe, and Cashfree are scaffolded at the product and database level. Checkout secrets stay server-side when activated.</p></div>
+      <div>
+        <h3>Current entitlement: {currentPlan.name}</h3>
+        <p>Plan access is read from your Supabase profile/subscription records. Online checkout is not active yet, so upgrades must be provisioned by an authorized admin or future server-side billing workflow.</p>
+      </div>
     </section>
     <section className="plan-grid">
       {plans.map((plan) => <article className={`card plan-card ${plan.id === currentPlan.id ? "active" : ""}`} key={plan.id}>
@@ -229,7 +256,7 @@ function PlansPage({ profile, saveProfile }: { profile: Profile; saveProfile: (v
         <strong>{plan.price}</strong>
         <p>{plan.aiLimit} AI coach messages/month</p>
         <ul>{plan.features.map((feature) => <li key={feature}>{feature}</li>)}</ul>
-        <button className="btn primary" onClick={() => saveProfile({ plan_id: plan.id })}>{plan.id === currentPlan.id ? "Current plan" : "Select plan"}</button>
+        <button className="btn primary" disabled>{plan.id === currentPlan.id ? "Current plan" : "Upgrade unavailable"}</button>
       </article>)}
     </section>
   </FeaturePage>;
@@ -249,7 +276,7 @@ function VerificationPage({ rows, openForm }: { rows: VerificationRequest[]; ope
   </FeaturePage>;
 }
 
-function AiCoach({ usage, setToast }: { usage: UsageSummary; setToast: (toast: ToastState) => void }) {
+function AiCoach({ usage, accessToken, setToast }: { usage: UsageSummary; accessToken?: string; setToast: (toast: ToastState) => void }) {
   const [topic, setTopic] = useState("Training Coach");
   const [prompt, setPrompt] = useState("");
   const [answer, setAnswer] = useState("");
@@ -261,8 +288,16 @@ function AiCoach({ usage, setToast }: { usage: UsageSummary; setToast: (toast: T
       setToast({ type: "warning", message: "Enter a training question before asking AI Coach." });
       return;
     }
+    if (!usage.limit) {
+      setToast({ type: "error", message: "AI Coach is not available on the Free plan. Upgrade to an eligible plan to use AI." });
+      return;
+    }
     if (remaining <= 0) {
-      setToast({ type: "error", message: "Monthly AI limit reached. Upgrade plan or add future AI credits." });
+      setToast({ type: "error", message: "Monthly AI limit reached for your current plan." });
+      return;
+    }
+    if (!accessToken) {
+      setToast({ type: "error", message: "Please sign in again before using AI Coach." });
       return;
     }
     setLoading(true);
@@ -270,8 +305,8 @@ function AiCoach({ usage, setToast }: { usage: UsageSummary; setToast: (toast: T
     try {
       const response = await fetch("/.netlify/functions/ai-coach", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, prompt, plan: usage.plan.id, monthlyLimit: usage.limit })
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ topic, prompt })
       });
       const payload = await response.json() as { answer?: string; error?: string };
       if (!response.ok) throw new Error(payload.error || "AI request failed.");
@@ -285,12 +320,13 @@ function AiCoach({ usage, setToast }: { usage: UsageSummary; setToast: (toast: T
 
   return <FeaturePage title="Secure AI Coach">
     <section className="card panel ai-panel">
-      <div className="usage-bar"><span>Monthly AI usage</span><strong>{usage.used}/{usage.limit}</strong><i style={{ width: `${Math.min(100, (usage.used / usage.limit) * 100)}%` }} /></div>
+      <div className="usage-bar"><span>Monthly AI usage</span><strong>{usage.used}/{usage.limit}</strong><i style={{ width: `${usage.limit ? Math.min(100, (usage.used / usage.limit) * 100) : 0}%` }} /></div>
+      {!usage.limit && <p className="notice" role="status">Free plan includes zero AI access. AI requests are also blocked on the server before OpenAI is called.</p>}
       <select value={topic} onChange={(e) => setTopic(e.target.value)} aria-label="AI coaching topic">
         {["Training Coach", "Tournament Preparation", "Match Analysis", "Nutrition Advice", "Recovery Advice", "Goal Suggestions", "Performance Reports", "Motivational Feedback"].map((item) => <option key={item}>{item}</option>)}
       </select>
       <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Describe your goal, recent training, opponent, recovery issue, or tournament situation." />
-      <button className="btn primary" onClick={ask} disabled={loading || remaining <= 0}>{loading ? "Thinking..." : "Ask AI Coach"}</button>
+      <button className="btn primary" onClick={ask} disabled={loading || remaining <= 0 || !usage.limit}>{loading ? "Thinking..." : "Ask AI Coach"}</button>
       {answer && <div className="answer">{answer}</div>}
     </section>
   </FeaturePage>;
@@ -311,33 +347,99 @@ function AdminPage({ data }: { data: CloudData }) {
   </FeaturePage>;
 }
 
+function OnboardingPage({ profile, saveProfile }: { profile: Profile; saveProfile: (values: Partial<Profile>) => Promise<void> }) {
+  const [values, setValues] = useState<Partial<Profile>>({
+    full_name: profile.full_name || "",
+    belt: profile.belt || "",
+    academy: profile.academy || "",
+    coach: profile.coach || "",
+    emergency_contact: profile.emergency_contact || ""
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setError("");
+    setSaving(true);
+    try {
+      await saveProfile(values);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Profile could not be saved. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return <main className="onboarding-page">
+    <section className="auth-card">
+      <span className="eyebrow">First setup</span>
+      <h1>Complete your AthleteOS profile</h1>
+      <p>Add your real athlete details to continue to the dashboard. Demo athlete data is never inserted for authenticated users.</p>
+      <form onSubmit={submit}>
+        <Field label="Full name" value={values.full_name || ""} onChange={(event) => setValues({ ...values, full_name: event.target.value })} required />
+        <Field label="Belt" value={values.belt || ""} onChange={(event) => setValues({ ...values, belt: event.target.value })} />
+        <Field label="Academy" value={values.academy || ""} onChange={(event) => setValues({ ...values, academy: event.target.value })} />
+        <Field label="Coach" value={values.coach || ""} onChange={(event) => setValues({ ...values, coach: event.target.value })} />
+        <Field label="Emergency contact" value={values.emergency_contact || ""} onChange={(event) => setValues({ ...values, emergency_contact: event.target.value })} />
+        <button className="btn primary" disabled={saving}>{saving ? "Saving..." : "Save profile and continue"}</button>
+      </form>
+      {error && <p className="notice" role="alert">{error}</p>}
+    </section>
+  </main>;
+}
+
 function AppShell() {
   const auth = useAuth();
   const [page, setPage] = useState<PageId>("dashboard");
   const [toast, setToast] = useState<ToastState>(null);
-  const { data, loading, refresh } = useCloudData(auth.user?.id, setToast);
+  const { data, loading, refresh, hasProfile } = useCloudData(auth.user?.id, setToast);
   const [form, setForm] = useState<{ resource: Resource; values: Record<string, string | number | boolean> } | null>(null);
+  const isAdmin = isAdminProfile(data.profile);
+  const visibleNav = useMemo(() => nav.filter(([id]) => id !== "admin" || isAdmin), [isAdmin]);
 
-  const current = useMemo(() => nav.find(([id]) => id === page), [page]);
-  const plan = getPlan(data.profile.plan_id);
-  const usage: UsageSummary = { used: data.notifications.filter((item) => item.title?.includes("AI")).length, limit: plan.aiLimit, plan };
+  useEffect(() => {
+    if (!loading && hasProfile && !isAdmin && page === "admin") setPage("dashboard");
+  }, [loading, hasProfile, isAdmin, page]);
 
-  async function save(resource: Resource, values: Record<string, string | number | boolean>) {
+  useEffect(() => {
+    if (loading) return;
+    if (!hasProfile && window.location.pathname !== "/onboarding") {
+      window.history.replaceState(null, "", "/onboarding");
+    } else if (hasProfile && window.location.pathname === "/onboarding") {
+      window.history.replaceState(null, "", "/");
+    }
+  }, [loading, hasProfile]);
+
+  const current = useMemo(() => visibleNav.find(([id]) => id === page), [page, visibleNav]);
+  const activeSubscription = data.subscriptions.find((item) => ["active", "trialing"].includes(item.status));
+  const plan = getPlan(activeSubscription?.plan_id || data.profile.plan_id);
+  const usage: UsageSummary = { used: data.aiUsage.length, limit: plan.aiLimit, plan };
+
+  async function save(resource: Resource, values: Record<string, string | number | boolean>, options: { rethrow?: boolean } = {}) {
     try {
       const user_id = auth.user?.id;
       if (!user_id && resource !== "roadmap") throw new Error("You must be logged in.");
-      if (resource === "profile") await upsertRow("profile", { ...data.profile, ...values, user_id });
+      if (resource === "profile") {
+        const safeValues = { ...values };
+        delete safeValues.role;
+        delete safeValues.plan_id;
+        delete safeValues.verified_athlete;
+        delete safeValues.founder_badge;
+        await upsertRow("profile", { ...data.profile, ...safeValues, user_id });
+      }
       else await insertRow(resource, { ...values, user_id });
       setToast({ type: "success", message: "Saved securely in Supabase." });
       setForm(null);
       await refresh();
     } catch (error) {
       setToast({ type: "error", message: error instanceof Error ? error.message : "Save failed." });
+      if (options.rethrow) throw error;
     }
   }
 
   async function saveProfile(values: Partial<Profile>) {
-    await save("profile", values as Record<string, string | number | boolean>);
+    await save("profile", values as Record<string, string | number | boolean>, { rethrow: true });
   }
 
   async function remove(resource: Resource, id?: string) {
@@ -355,9 +457,10 @@ function AppShell() {
 
   let content: React.ReactNode = null;
   if (loading) content = <div className="skeleton card">Loading AthleteOS V2...</div>;
+  else if (!hasProfile) return <OnboardingPage profile={data.profile} saveProfile={saveProfile} />;
   else if (page === "dashboard") content = <Dashboard data={data} usage={usage} openForm={openForm} />;
   else if (page === "profile") content = <FeaturePage title="Athlete Profile" actions={<button className="btn primary" onClick={() => openForm("profile")}><User size={16} /> Edit profile</button>}><section className="card panel profile-grid"><div className="avatar-lg">{(data.profile.full_name || "A").slice(0, 2)}</div><div><h3>{data.profile.full_name}</h3><p>{data.profile.belt} | {data.profile.academy}</p><p>Coach: {data.profile.coach}</p><p>Emergency: {data.profile.emergency_contact}</p><div className="badge-row">{data.profile.verified_athlete && <span className="verified"><BadgeCheck size={14} /> Verified Athlete</span>}{data.profile.founder_badge && <span className="verified"><Star size={14} /> Founder</span>}</div></div></section></FeaturePage>;
-  else if (page === "plans") content = <PlansPage profile={data.profile} saveProfile={saveProfile} />;
+  else if (page === "plans") content = <PlansPage profile={data.profile} subscriptions={data.subscriptions} />;
   else if (page === "verification") content = <VerificationPage rows={data.verifications} openForm={openForm} />;
   else if (page === "tournaments") content = <FeaturePage title="Tournaments" actions={<button className="btn primary" onClick={() => openForm("tournaments")}><Plus size={16} /> Add</button>}><DataTable rows={data.tournaments} empty="No tournaments yet" columns={[{ key: "name", label: "Tournament" }, { key: "starts_at", label: "Date" }, { key: "location", label: "Location" }, { key: "status", label: "Status" }, { key: "remove", label: "", render: (row) => <button className="plain danger" onClick={() => remove("tournaments", row.id)}>Delete</button> }]} /></FeaturePage>;
   else if (page === "training") content = <FeaturePage title="Training Sessions" actions={<button className="btn primary" onClick={() => openForm("training")}><Plus size={16} /> Log</button>}><DataTable rows={data.training} empty="No training sessions yet" columns={[{ key: "title", label: "Session" }, { key: "session_date", label: "Date" }, { key: "minutes", label: "Minutes" }, { key: "intensity", label: "Intensity" }]} /></FeaturePage>;
@@ -366,13 +469,13 @@ function AppShell() {
   else if (page === "weight") content = <FeaturePage title="Weight Tracker" actions={<button className="btn primary" onClick={() => openForm("weights")}><Plus size={16} /> Log</button>}><section className="card panel"><ResponsiveContainer width="100%" height={320}><LineChart data={data.weights}><CartesianGrid strokeDasharray="3 3" stroke="#25405f" /><XAxis dataKey="logged_at" /><YAxis /><Tooltip /><Line type="monotone" dataKey="weight_kg" stroke="#52ddac" strokeWidth={3} /></LineChart></ResponsiveContainer></section></FeaturePage>;
   else if (page === "calendar") content = <FeaturePage title="Calendar"><DataTable rows={data.training.map((item) => ({ ...item, event_type: "training" })).concat(data.tournaments.map((item) => ({ id: item.id, title: item.name, session_date: item.starts_at || "", event_type: "competition", minutes: 0 })))} empty="No calendar events" columns={[{ key: "title", label: "Event" }, { key: "session_date", label: "Date" }, { key: "event_type", label: "Type" }]} /></FeaturePage>;
   else if (page === "checklist") content = <FeaturePage title="Competition Checklist" actions={<button className="btn primary" onClick={() => openForm("checklist")}><Plus size={16} /> Add</button>}><section className="card checklist">{data.checklist.map((item) => <label key={item.id || item.item}><input type="checkbox" checked={Boolean(item.completed)} readOnly /> {item.item}<span>{item.category}</span></label>)}</section></FeaturePage>;
-  else if (page === "ai") content = <AiCoach usage={usage} setToast={setToast} />;
+  else if (page === "ai") content = <AiCoach usage={usage} accessToken={auth.session?.access_token} setToast={setToast} />;
   else if (page === "feedback") content = <FeaturePage title="Feedback portal" actions={<button className="btn primary" onClick={() => openForm("feedback")}><Plus size={16} /> Submit feedback</button>}><DataTable rows={data.feedback} empty="No feedback yet" columns={[{ key: "title", label: "Title" }, { key: "status", label: "Status" }, { key: "priority", label: "Priority" }]} /></FeaturePage>;
   else if (page === "roadmap") content = <FeaturePage title="Public roadmap"><DataTable rows={data.roadmap} empty="Roadmap is being prepared" columns={[{ key: "title", label: "Feature" }, { key: "status", label: "Status" }, { key: "votes", label: "Votes" }]} /></FeaturePage>;
-  else if (page === "admin") content = <AdminPage data={data} />;
+  else if (page === "admin") content = isAdmin ? <AdminPage data={data} /> : <FeaturePage title="Access denied"><section className="card panel"><h3>Admin access required</h3><p>Your account is not authorized to view admin operations.</p></section></FeaturePage>;
 
   return <div className="app-shell">
-    <aside className="sidebar"><div className="brand"><Shield /> <span>Athlete<span>OS</span></span></div><p className="edition">Taekwondo Edition V2</p><nav>{nav.map(([id, label, Icon]) => <button key={id} className={id === page ? "active" : ""} onClick={() => setPage(id)}><Icon size={18} /> {label}</button>)}</nav><button className="logout" onClick={auth.signOut}><LogOut size={16} /> Logout</button></aside>
+    <aside className="sidebar"><div className="brand"><Shield /> <span>Athlete<span>OS</span></span></div><p className="edition">Taekwondo Edition V2</p><nav>{visibleNav.map(([id, label, Icon]) => <button key={id} className={id === page ? "active" : ""} onClick={() => setPage(id)}><Icon size={18} /> {label}</button>)}</nav><button className="logout" onClick={auth.signOut}><LogOut size={16} /> Logout</button></aside>
     <main><header><div><p className="eyebrow">Nova Code Cloud</p><h1>{current?.[1] || "Dashboard"}</h1></div><button className="icon-btn" aria-label="Notifications"><Bell size={18} /></button></header>{!auth.emailVerified && <div className="card panel verify-banner"><BadgeCheck /><span>Please verify your email to unlock full account trust features.</span></div>}{content}<footer>Copyright © 2026 Nova Code</footer></main>
     <Toast toast={toast} />
     {form && <RecordModal form={form} setForm={setForm} save={save} profile={data.profile} />}
@@ -387,7 +490,7 @@ function RecordModal({ form, setForm, save, profile }: {
 }) {
   const [values, setValues] = useState<Record<string, string | number | boolean>>(form.resource === "profile" ? profile as Record<string, string | number | boolean> : {});
   const fields: Array<[string, string, string?, string[]?]> = ({
-    profile: [["full_name", "Name"], ["date_of_birth", "Date of birth", "date"], ["weight_kg", "Weight", "number"], ["height_cm", "Height", "number"], ["belt", "Belt"], ["academy", "Academy"], ["coach", "Coach"], ["emergency_contact", "Emergency contact"], ["plan_id", "Plan", "select", plans.map((plan) => plan.id)]],
+    profile: [["full_name", "Name"], ["date_of_birth", "Date of birth", "date"], ["weight_kg", "Weight", "number"], ["height_cm", "Height", "number"], ["belt", "Belt"], ["academy", "Academy"], ["coach", "Coach"], ["emergency_contact", "Emergency contact"]],
     tournaments: [["name", "Tournament"], ["starts_at", "Date", "date"], ["location", "Location"], ["status", "Status"], ["opponent_notes", "Opponent notes"], ["match_notes", "Match notes"]],
     training: [["title", "Session"], ["session_date", "Date", "date"], ["minutes", "Minutes", "number"], ["intensity", "Intensity"]],
     medals: [["event_name", "Event"], ["medal_type", "Medal"], ["category", "Category"], ["awarded_at", "Date", "date"]],

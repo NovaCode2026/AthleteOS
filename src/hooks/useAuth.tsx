@@ -27,6 +27,29 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function toSafeAuthError(error: unknown, fallback: string) {
+  const message = error instanceof Error ? error.message : "";
+  const lower = message.toLowerCase();
+
+  if (error instanceof TypeError && lower.includes("failed to fetch")) {
+    return new Error("Unable to connect to AthleteOS services. Please check your connection and try again.");
+  }
+  if (lower.includes("fetch") || lower.includes("network")) {
+    return new Error("Registration service is temporarily unavailable. Please try again.");
+  }
+  if (lower.includes("invalid login credentials")) {
+    return new Error("The email or password is incorrect.");
+  }
+  if (lower.includes("already registered") || lower.includes("already exists")) {
+    return new Error("An account with this email may already exist. Try logging in or resetting your password.");
+  }
+  if (lower.includes("password")) {
+    return new Error("Your email or password could not be accepted. Please check the requirements and try again.");
+  }
+
+  return new Error(message || fallback);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -57,29 +80,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     configured: Boolean(supabase),
     emailVerified: Boolean(session?.user.email_confirmed_at),
     async signUp({ email, password, metadata }) {
-      const { error } = await requireSupabase().auth.signUp({
-        email,
-        password,
-        options: {
-          data: metadata,
-          emailRedirectTo: window.location.origin
-        }
-      });
-      if (error) throw error;
+      try {
+        const { error } = await requireSupabase().auth.signUp({
+          email,
+          password,
+          options: {
+            data: metadata,
+            emailRedirectTo: `${window.location.origin}/onboarding`
+          }
+        });
+        if (error) throw error;
+      } catch (error) {
+        throw toSafeAuthError(error, "Registration could not be completed. Please try again.");
+      }
     },
     async signIn({ email, password }) {
-      const { error } = await requireSupabase().auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      try {
+        const { error } = await requireSupabase().auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      } catch (error) {
+        throw toSafeAuthError(error, "Login could not be completed. Please try again.");
+      }
     },
     async resetPassword(email) {
-      const { error } = await requireSupabase().auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`
-      });
-      if (error) throw error;
+      try {
+        const { error } = await requireSupabase().auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/reset-password`
+        });
+        if (error) throw error;
+      } catch (error) {
+        throw toSafeAuthError(error, "Password reset could not be started. Please try again.");
+      }
     },
     async updatePassword(password) {
-      const { error } = await requireSupabase().auth.updateUser({ password });
-      if (error) throw error;
+      try {
+        const { error } = await requireSupabase().auth.updateUser({ password });
+        if (error) throw error;
+      } catch (error) {
+        throw toSafeAuthError(error, "Password could not be updated. Please try again.");
+      }
     },
     async signOut() {
       const { error } = await requireSupabase().auth.signOut();

@@ -13,7 +13,7 @@ Calls OpenAI from a server-only Netlify Function.
 }
 ```
 
-All OpenAI requests require `OPENAI_API_KEY` in Netlify environment variables.
+All OpenAI requests require `OPENAI_API_KEY` in Netlify environment variables. The function also requires an authenticated Supabase bearer token and verifies the user's profile/subscription entitlement before calling OpenAI. Free plan users receive zero AI access.
 
 ## Supabase
 
