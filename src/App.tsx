@@ -194,27 +194,43 @@ function useCloudData(userId: string | undefined, setToast: (toast: ToastState) 
   async function refresh() {
     if (!userId || !isSupabaseConfigured) return;
     setLoading(true);
+    const dataErrors: string[] = [];
+
+    async function loadUserRows<T>(resource: Resource, options: { order?: string; ascending?: boolean } = {}) {
+      try {
+        return await listRows<T>(resource, userId, options);
+      } catch (error) {
+        dataErrors.push(error instanceof Error ? error.message : `Unable to load ${resource}.`);
+        return [] as T[];
+      }
+    }
+
     try {
-      const [profiles, tournaments, training, medals, weights, goals, checklist, documents, notifications, feedback, verifications, roadmap, aiUsage, subscriptions, subscriptionUsage] = await Promise.all([
-        listRows<Profile>("profile", userId),
-        listRows<Tournament>("tournaments", userId, { order: "starts_at", ascending: true }),
-        listRows<TrainingSession>("training", userId, { order: "session_date", ascending: false }),
-        listRows<MedalRecord>("medals", userId, { order: "awarded_at", ascending: false }),
-        listRows<WeightLog>("weights", userId, { order: "logged_at", ascending: true }),
-        listRows<Goal>("goals", userId, { order: "target_date", ascending: true }),
-        listRows<ChecklistItem>("checklist", userId),
-        listRows<DocumentRecord>("documents", userId, { order: "created_at" }),
-        listRows<{ id?: string; title: string; body?: string; read_at?: string }>("notifications", userId, { order: "created_at" }),
-        listRows<FeedbackItem>("feedback", userId, { order: "created_at" }),
-        listRows<VerificationRequest>("verifications", userId, { order: "created_at" }),
-        listRows<RoadmapItem>("roadmap", undefined, { order: "votes", publicRows: true }),
-        listRows<AiUsageEvent>("aiUsage", userId, { order: "created_at" }),
-        listRows<Subscription>("subscriptions", userId, { order: "created_at" }),
-        listRows<SubscriptionUsage>("subscriptionUsage", userId, { order: "usage_month" })
-      ]);
+      const profiles = await listRows<Profile>("profile", userId);
       const savedProfile = profiles[0];
       const profileComplete = Boolean(savedProfile?.full_name?.trim());
       const profile = savedProfile || { user_id: userId, plan_id: "free", role: "athlete" };
+
+      const [tournaments, training, medals, weights, goals, checklist, documents, notifications, feedback, verifications, roadmapRows, aiUsage, subscriptions, subscriptionUsage] = await Promise.all([
+        loadUserRows<Tournament>("tournaments", { order: "starts_at", ascending: true }),
+        loadUserRows<TrainingSession>("training", { order: "session_date", ascending: false }),
+        loadUserRows<MedalRecord>("medals", { order: "awarded_at", ascending: false }),
+        loadUserRows<WeightLog>("weights", { order: "logged_at", ascending: true }),
+        loadUserRows<Goal>("goals", { order: "target_date", ascending: true }),
+        loadUserRows<ChecklistItem>("checklist"),
+        loadUserRows<DocumentRecord>("documents", { order: "created_at" }),
+        loadUserRows<{ id?: string; title: string; body?: string; read_at?: string }>("notifications", { order: "created_at" }),
+        loadUserRows<FeedbackItem>("feedback", { order: "created_at" }),
+        loadUserRows<VerificationRequest>("verifications", { order: "created_at" }),
+        listRows<RoadmapItem>("roadmap", undefined, { order: "votes", publicRows: true }).catch((error) => {
+          dataErrors.push(error instanceof Error ? error.message : "Unable to load roadmap.");
+          return fallbackRoadmap;
+        }),
+        loadUserRows<AiUsageEvent>("aiUsage", { order: "created_at" }),
+        loadUserRows<Subscription>("subscriptions", { order: "created_at" }),
+        loadUserRows<SubscriptionUsage>("subscriptionUsage", { order: "usage_month" })
+      ]);
+
       setHasProfile(profileComplete);
       setData({
         profile,
@@ -228,13 +244,18 @@ function useCloudData(userId: string | undefined, setToast: (toast: ToastState) 
         notifications,
         feedback,
         verifications,
-        roadmap: roadmap.length ? roadmap : fallbackRoadmap,
+        roadmap: roadmapRows.length ? roadmapRows : fallbackRoadmap,
         aiUsage,
         subscriptions,
         subscriptionUsage
       });
+
+      if (dataErrors.length > 0) {
+        setToast({ type: "warning", message: dataErrors.slice(0, 2).join(" ") });
+      }
     } catch (error) {
-      setToast({ type: "error", message: error instanceof Error ? error.message : "Unable to load AthleteOS data from Supabase." });
+      setHasProfile(false);
+      setToast({ type: "error", message: error instanceof Error ? error.message : "Unable to load profile." });
     } finally {
       setLoading(false);
     }
@@ -463,7 +484,11 @@ function AppShell() {
       else await insertRow(resource, { ...values, user_id });
       setToast({ type: "success", message: "Saved securely in Supabase." });
       setForm(null);
-      await refresh();
+      try {
+        await refresh();
+      } catch {
+        setToast({ type: "warning", message: "Saved profile, but some dashboard data could not be refreshed." });
+      }
     } catch (error) {
       setToast({ type: "error", message: error instanceof Error ? error.message : "Save failed." });
       if (options.rethrow) throw error;
