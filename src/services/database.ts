@@ -35,9 +35,19 @@ export const TABLES = {
 
 export type Resource = keyof typeof TABLES;
 
+function extractDatabaseMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return "The database request failed.";
+}
+
 function toDatabaseError(resource: Resource, action: string, error: unknown) {
-  const message = error instanceof Error ? error.message : "Unknown database error.";
-  return new Error(`Unable to ${action} ${resource}. ${message}`);
+  const detail = extractDatabaseMessage(error);
+  const safeDetail = import.meta.env.DEV ? ` ${detail}` : " Please try again later.";
+  return new Error(`Unable to ${action} ${resource}.${safeDetail}`);
 }
 
 export async function listRows<T>(resource: Resource, userId?: string, options: { order?: string; ascending?: boolean; publicRows?: boolean } = {}) {
@@ -50,9 +60,12 @@ export async function listRows<T>(resource: Resource, userId?: string, options: 
   return (data ?? []) as T[];
 }
 
-export async function upsertRow<T extends Record<string, unknown>>(resource: Resource, values: T) {
+export async function upsertRow<T extends Record<string, unknown>>(resource: Resource, values: T, options: { onConflict?: string } = {}) {
   const table = TABLES[resource];
-  const { data, error } = await requireSupabase().from(table).upsert(values).select().single();
+  const query = options.onConflict
+    ? requireSupabase().from(table).upsert(values, { onConflict: options.onConflict })
+    : requireSupabase().from(table).upsert(values);
+  const { data, error } = await query.select().single();
   if (error) throw toDatabaseError(resource, "save", error);
   return data;
 }

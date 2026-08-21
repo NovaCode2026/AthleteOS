@@ -20,6 +20,7 @@ import "./styles/main.css";
 type PageId = "dashboard" | "profile" | "plans" | "verification" | "tournaments" | "training" | "medals" | "documents" | "weight" | "calendar" | "checklist" | "ai" | "feedback" | "roadmap" | "admin";
 type ToastState = { type: "success" | "error" | "warning"; message: string } | null;
 type AdminRole = "support_admin" | "admin" | "super_admin";
+type AuthMode = "login" | "register" | "forgot" | "reset";
 
 const adminRoles = new Set<AdminRole>(["support_admin", "admin", "super_admin"]);
 
@@ -44,6 +45,39 @@ function isAdminProfile(profile: Profile) {
   return adminRoles.has(profile.role as AdminRole);
 }
 
+function isPasswordResetRoute() {
+  return window.location.pathname === "/reset-password";
+}
+
+function sanitizeProfileValues(values: Partial<Profile>) {
+  const safeValues: Partial<Profile> = {};
+  const allowedKeys: Array<keyof Profile> = [
+    "full_name",
+    "date_of_birth",
+    "profile_image_path",
+    "weight_kg",
+    "height_cm",
+    "belt",
+    "academy",
+    "coach",
+    "emergency_contact",
+    "achievements"
+  ];
+
+  for (const key of allowedKeys) {
+    if (values[key] !== undefined) {
+      safeValues[key] = values[key] as never;
+    }
+  }
+
+  if (!safeValues.full_name?.trim()) {
+    throw new Error("Full name is required to complete onboarding.");
+  }
+
+  safeValues.full_name = safeValues.full_name.trim();
+  return safeValues;
+}
+
 const fallbackRoadmap: RoadmapItem[] = [
   { title: "Athlete Resume PDF", description: "Generate a polished verified athlete resume from profile, medals, and certificates.", status: "planned", votes: 24 },
   { title: "AI Credit Packs", description: "Allow extra AI coach usage beyond monthly plan limits.", status: "research", votes: 18 },
@@ -62,9 +96,9 @@ function Toast({ toast }: { toast: ToastState }) {
   return toast ? <div className={`toast ${toast.type}`} role="status">{toast.message}</div> : null;
 }
 
-function AuthScreen() {
+function AuthScreen({ initialMode }: { initialMode?: AuthMode }) {
   const auth = useAuth();
-  const [mode, setMode] = useState<"login" | "register" | "forgot" | "reset">("login");
+  const [mode, setMode] = useState<AuthMode>(initialMode || (isPasswordResetRoute() ? "reset" : "login"));
   const [form, setForm] = useState({ email: "", password: "", name: "" });
   const [message, setMessage] = useState("");
 
@@ -81,6 +115,8 @@ function AuthScreen() {
       } else if (mode === "reset") {
         await auth.updatePassword(form.password);
         setMessage("Password updated. You can continue to AthleteOS.");
+        window.history.replaceState(null, "", "/");
+        setMode("login");
       } else {
         await auth.signIn({ email: form.email, password: form.password });
       }
@@ -105,7 +141,7 @@ function AuthScreen() {
       <p>Secure cloud command center for training, tournaments, documents, medals, goals, verification, plans, and AI coaching.</p>
       <form onSubmit={submit}>
         {mode === "register" && <Field label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />}
-        <Field label="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+        {mode !== "reset" && <Field label="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />}
         {mode !== "forgot" && <Field label="Password" type="password" minLength={8} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />}
         <label className="remember"><input type="checkbox" defaultChecked /> Remember me on this device</label>
         <button className="btn primary">{mode === "register" ? "Create account" : mode === "forgot" ? "Send reset email" : mode === "reset" ? "Update password" : "Log in"}</button>
@@ -115,7 +151,7 @@ function AuthScreen() {
         <button onClick={() => setMode("login")}>Login</button>
         <button onClick={() => setMode("register")}>Register</button>
         <button onClick={() => setMode("forgot")}>Forgot password</button>
-        <button onClick={() => setMode("reset")}>Reset password</button>
+        {mode === "reset" && <button onClick={() => setMode("reset")}>Reset password</button>}
       </div>
     </section>
   </main>;
@@ -421,12 +457,8 @@ function AppShell() {
       const user_id = auth.user?.id;
       if (!user_id && resource !== "roadmap") throw new Error("You must be logged in.");
       if (resource === "profile") {
-        const safeValues = { ...values };
-        delete safeValues.role;
-        delete safeValues.plan_id;
-        delete safeValues.verified_athlete;
-        delete safeValues.founder_badge;
-        await upsertRow("profile", { ...data.profile, ...safeValues, user_id });
+        const safeValues = sanitizeProfileValues(values as Partial<Profile>);
+        await upsertRow("profile", { ...safeValues, user_id }, { onConflict: "user_id" });
       }
       else await insertRow(resource, { ...values, user_id });
       setToast({ type: "success", message: "Saved securely in Supabase." });
@@ -508,6 +540,7 @@ function RecordModal({ form, setForm, save, profile }: {
 function ProtectedApp() {
   const auth = useAuth();
   if (auth.loading) return <main className="auth-page"><section className="auth-card">Loading secure session...</section></main>;
+  if (isPasswordResetRoute()) return <AuthScreen initialMode="reset" />;
   return auth.user ? <AppShell /> : <AuthScreen />;
 }
 
