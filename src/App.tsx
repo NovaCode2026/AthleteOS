@@ -11,7 +11,7 @@ import {
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { isSupabaseConfigured, supabaseConfig } from "./lib/supabase";
 import {
-  createSignedFileUrl, deletePrivateFile, deleteRow, insertRow, listRows, uploadPrivateFile, upsertRow, type Resource
+  createSignedFileUrl, deletePrivateFile, deleteRow, insertRow, listRows, updateRow, uploadPrivateFile, upsertRow, type Resource
 } from "./services/database";
 import { plans, getPlan } from "./config/plans";
 import type {
@@ -42,7 +42,7 @@ const nav: Array<[PageId, string, typeof Activity]> = [
   ["ai", "AI Coach", Sparkles],
   ["feedback", "Feedback", HeartPulse],
   ["roadmap", "Roadmap", Target],
-  ["admin", "Admin", Gauge]
+  ["admin", "Admin Panel", Gauge]
 ];
 
 function isAdminProfile(profile: Profile) {
@@ -55,6 +55,10 @@ function isPasswordResetRoute() {
 
 function isAuthCallbackRoute() {
   return window.location.pathname === "/auth/callback";
+}
+
+function pageFromPath(): PageId {
+  return window.location.pathname === "/admin" ? "admin" : "dashboard";
 }
 
 function sanitizeProfileValues(values: Partial<Profile>) {
@@ -262,7 +266,7 @@ function useCloudData(userId: string | undefined, setToast: (toast: ToastState) 
       const profiles = await listRows<Profile>("profile", userId);
       const savedProfile = profiles[0];
       const profileComplete = Boolean(savedProfile?.full_name?.trim());
-      const profile = savedProfile || { user_id: userId, plan_id: "free", role: "athlete" };
+      const profile = savedProfile || { user_id: userId, plan_id: "free", role: "user" };
 
       const [tournaments, training, medals, weights, goals, checklist, documents, notifications, feedback, verifications, roadmapRows, roadmapVotes, tournamentScans, aiUsage, subscriptions, subscriptionUsage] = await Promise.all([
         loadUserRows<Tournament>("tournaments", { order: "starts_at", ascending: true }),
@@ -273,7 +277,10 @@ function useCloudData(userId: string | undefined, setToast: (toast: ToastState) 
         loadUserRows<ChecklistItem>("checklist"),
         loadUserRows<DocumentRecord>("documents", { order: "created_at" }),
         loadUserRows<{ id?: string; title: string; body?: string; read_at?: string }>("notifications", { order: "created_at" }),
-        loadUserRows<FeedbackItem>("feedback", { order: "created_at" }),
+        listRows<FeedbackItem>("feedback", userId, { order: "created_at", publicRows: true }).catch((error) => {
+          dataErrors.push(error instanceof Error ? error.message : "Unable to load feedback.");
+          return [] as FeedbackItem[];
+        }),
         loadUserRows<VerificationRequest>("verifications", { order: "created_at" }),
         listRows<RoadmapItem>("roadmap", undefined, { order: "votes", publicRows: true }).catch((error) => {
           dataErrors.push(error instanceof Error ? error.message : "Unable to load roadmap.");
@@ -498,15 +505,31 @@ function DocumentsPage({ rows, openForm, openDocument, removeDocument }: {
   </FeaturePage>;
 }
 
-function RoadmapPage({ rows, vote }: { rows: RoadmapItem[]; vote: (item: RoadmapItem) => Promise<void> }) {
-  return <FeaturePage title="Public roadmap">
+function RoadmapPage({
+  rows,
+  vote,
+  isAdmin,
+  openForm,
+  updateStatus,
+  removeItem
+}: {
+  rows: RoadmapItem[];
+  vote: (item: RoadmapItem) => Promise<void>;
+  isAdmin: boolean;
+  openForm: (resource: Resource) => void;
+  updateStatus: (item: RoadmapItem, status: string) => Promise<void>;
+  removeItem: (item: RoadmapItem) => Promise<void>;
+}) {
+  return <FeaturePage title="Public roadmap" actions={isAdmin ? <button className="btn primary" onClick={() => openForm("roadmap")}><Plus size={16} /> Add roadmap item</button> : undefined}>
     <section className="card panel">
-      <p>Votes are stored in Supabase. Each authenticated user can vote once per feature; totals are maintained by the database.</p>
+      <p>Votes are stored in Supabase. Each authenticated user can vote once per feature; totals are maintained by the database. Admin-only controls are protected by RLS.</p>
       <DataTable rows={rows} empty="Roadmap is being prepared" columns={[
         { key: "title", label: "Feature" },
-        { key: "status", label: "Status" },
+        { key: "status", label: "Status", render: (row) => isAdmin ? <select value={row.status || "planned"} onChange={(event) => void updateStatus(row, event.target.value)} aria-label={`Update ${row.title} status`}>
+          {["research", "planned", "in-progress", "released"].map((status) => <option key={status} value={status}>{status}</option>)}
+        </select> : row.status },
         { key: "votes", label: "Votes" },
-        { key: "vote", label: "", render: (row) => <button className="btn" disabled={row.user_has_voted} onClick={() => void vote(row)}>{row.user_has_voted ? "Voted" : "Vote"}</button> }
+        { key: "vote", label: "", render: (row) => <div className="inline-actions"><button className="btn" disabled={row.user_has_voted} onClick={() => void vote(row)}>{row.user_has_voted ? "Voted" : "Vote"}</button>{isAdmin && <button className="plain danger" onClick={() => void removeItem(row)}>Delete</button>}</div> }
       ]} />
     </section>
   </FeaturePage>;
@@ -580,7 +603,7 @@ function TournamentScannerPage({ scans, planId, accessToken, refresh, setToast }
   </FeaturePage>;
 }
 
-function AdminPage({ data }: { data: CloudData }) {
+function AdminPage({ data, goDashboard }: { data: CloudData; goDashboard: () => void }) {
   return <FeaturePage title="Admin command center">
     <section className="metrics">
       <Stat icon={User} label="Users" value="RBAC" note="Admin policies ready" />
@@ -590,7 +613,8 @@ function AdminPage({ data }: { data: CloudData }) {
     </section>
     <section className="card panel">
       <h3>Operational controls</h3>
-      <p>Admin tables and RLS foundations are ready for review queues, plan management, feedback triage, badge awards, support tickets, announcements, feature flags, audit logs, academy management, and analytics. Grant `support_admin`, `admin`, or `super_admin` in `profiles.role` to unlock policy-scoped operations.</p>
+      <p>Admin tables and RLS foundations are ready for review queues, plan management, feedback triage, badge awards, support tickets, announcements, feature flags, audit logs, academy management, and analytics. Promote trusted staff through Supabase SQL or a service-role-only backend process; users cannot grant themselves admin privileges.</p>
+      <button className="btn" onClick={goDashboard}>Back to dashboard</button>
     </section>
   </FeaturePage>;
 }
@@ -639,16 +663,12 @@ function OnboardingPage({ profile, saveProfile }: { profile: Profile; saveProfil
 
 function AppShell() {
   const auth = useAuth();
-  const [page, setPage] = useState<PageId>("dashboard");
+  const [page, setPage] = useState<PageId>(() => pageFromPath());
   const [toast, setToast] = useState<ToastState>(null);
   const { data, loading, refresh, hasProfile } = useCloudData(auth.user?.id, setToast);
   const [form, setForm] = useState<{ resource: Resource; values: Record<string, string | number | boolean> } | null>(null);
   const isAdmin = isAdminProfile(data.profile);
   const visibleNav = useMemo(() => nav.filter(([id]) => id !== "admin" || isAdmin), [isAdmin]);
-
-  useEffect(() => {
-    if (!loading && hasProfile && !isAdmin && page === "admin") setPage("dashboard");
-  }, [loading, hasProfile, isAdmin, page]);
 
   useEffect(() => {
     if (loading) return;
@@ -659,7 +679,14 @@ function AppShell() {
     }
   }, [loading, hasProfile]);
 
+  useEffect(() => {
+    const syncPath = () => setPage(pageFromPath());
+    window.addEventListener("popstate", syncPath);
+    return () => window.removeEventListener("popstate", syncPath);
+  }, []);
+
   const current = useMemo(() => visibleNav.find(([id]) => id === page), [page, visibleNav]);
+  const pageTitle = current?.[1] || (page === "admin" ? "Admin Panel" : "Dashboard");
   const activeSubscription = data.subscriptions.find((item) => ["active", "trialing"].includes(item.status));
   const plan = getPlan(activeSubscription?.plan_id || data.profile.plan_id);
   const usage: UsageSummary = { used: data.aiUsage.length, limit: plan.aiLimit, plan };
@@ -676,11 +703,13 @@ function AppShell() {
       if (resource === "weights" && (!values.logged_at || !values.weight_kg)) throw new Error("Weight date and value are required.");
       if (resource === "documents" && (!values.title || !values.document_type)) throw new Error("Document name and type are required.");
       if (resource === "feedback" && !values.title) throw new Error("Feedback title is required.");
+      if (resource === "roadmap" && (!isAdmin || !values.title)) throw new Error(isAdmin ? "Roadmap title is required." : "Admin access required.");
       if (resource === "profile") {
         const safeValues = sanitizeProfileValues(values as Partial<Profile>);
         await upsertRow("profile", { ...safeValues, user_id }, { onConflict: "user_id" });
       }
-      else await insertRow(resource, { ...values, user_id });
+      else if (resource === "roadmap") await insertRow(resource, values);
+      else await insertRow(resource, resource === "feedback" ? { ...values, visibility: values.visibility || "public", user_id } : { ...values, user_id });
       setToast({ type: "success", message: "Saved securely in Supabase." });
       setForm(null);
       try {
@@ -746,6 +775,33 @@ function AppShell() {
     }
   }
 
+  function navigate(id: PageId) {
+    setPage(id);
+    window.history.pushState(null, "", id === "admin" ? "/admin" : "/");
+  }
+
+  async function updateRoadmapStatus(item: RoadmapItem, status: string) {
+    if (!item.id || !isAdmin) return;
+    try {
+      await updateRow("roadmap", item.id, { status });
+      setToast({ type: "success", message: "Roadmap status updated." });
+      await refresh();
+    } catch (error) {
+      setToast({ type: "error", message: error instanceof Error ? error.message : "Roadmap status could not be updated." });
+    }
+  }
+
+  async function removeRoadmapItem(item: RoadmapItem) {
+    if (!item.id || !isAdmin) return;
+    try {
+      await deleteRow("roadmap", item.id);
+      setToast({ type: "success", message: "Roadmap item deleted." });
+      await refresh();
+    } catch (error) {
+      setToast({ type: "error", message: error instanceof Error ? error.message : "Roadmap item could not be deleted." });
+    }
+  }
+
   function openForm(resource: Resource) { setForm({ resource, values: {} }); }
 
   let content: React.ReactNode = null;
@@ -765,12 +821,12 @@ function AppShell() {
   else if (page === "scanner") content = <TournamentScannerPage scans={data.tournamentScans} planId={plan.id} accessToken={auth.session?.access_token} refresh={refresh} setToast={setToast} />;
   else if (page === "ai") content = <AiCoach usage={usage} accessToken={auth.session?.access_token} setToast={setToast} />;
   else if (page === "feedback") content = <FeaturePage title="Feedback portal" actions={<button className="btn primary" onClick={() => openForm("feedback")}><Plus size={16} /> Submit feedback</button>}><DataTable rows={data.feedback} empty="No feedback yet" columns={[{ key: "title", label: "Title" }, { key: "status", label: "Status" }, { key: "priority", label: "Priority" }]} /></FeaturePage>;
-  else if (page === "roadmap") content = <RoadmapPage rows={data.roadmap} vote={voteRoadmap} />;
-  else if (page === "admin") content = isAdmin ? <AdminPage data={data} /> : <FeaturePage title="Access denied"><section className="card panel"><h3>Admin access required</h3><p>Your account is not authorized to view admin operations.</p></section></FeaturePage>;
+  else if (page === "roadmap") content = <RoadmapPage rows={data.roadmap} vote={voteRoadmap} isAdmin={isAdmin} openForm={openForm} updateStatus={updateRoadmapStatus} removeItem={removeRoadmapItem} />;
+  else if (page === "admin") content = isAdmin ? <AdminPage data={data} goDashboard={() => navigate("dashboard")} /> : <FeaturePage title="Access denied"><section className="card panel"><h3>Admin access required</h3><p>Your account is not authorized to view admin operations.</p><button className="btn" onClick={() => navigate("dashboard")}>Back to dashboard</button></section></FeaturePage>;
 
   return <div className="app-shell">
-    <aside className="sidebar"><div className="brand"><Shield /> <span>Athlete<span>OS</span></span></div><p className="edition">Taekwondo Edition V2</p><nav>{visibleNav.map(([id, label, Icon]) => <button key={id} className={id === page ? "active" : ""} onClick={() => setPage(id)}><Icon size={18} /> {label}</button>)}</nav><button className="logout" onClick={auth.signOut}><LogOut size={16} /> Logout</button></aside>
-    <main><header><div><p className="eyebrow">Nova Code Cloud</p><h1>{current?.[1] || "Dashboard"}</h1></div><button className="icon-btn" aria-label="Notifications"><Bell size={18} /></button></header>{!auth.emailVerified && <div className="card panel verify-banner"><BadgeCheck /><span>Please verify your email to unlock full account trust features.</span></div>}{content}<footer>Copyright © 2026 Nova Code</footer></main>
+    <aside className="sidebar"><div className="brand"><Shield /> <span>Athlete<span>OS</span></span></div><p className="edition">Taekwondo Edition V2</p><nav>{visibleNav.map(([id, label, Icon]) => <button key={id} className={id === page ? "active" : ""} onClick={() => navigate(id)}><Icon size={18} /> {label}</button>)}</nav><button className="logout" onClick={auth.signOut}><LogOut size={16} /> Logout</button></aside>
+    <main><header><div><p className="eyebrow">Nova Code Cloud</p><h1>{pageTitle}</h1></div><button className="icon-btn" aria-label="Notifications"><Bell size={18} /></button></header>{!auth.emailVerified && <div className="card panel verify-banner"><BadgeCheck /><span>Please verify your email to unlock full account trust features.</span></div>}{content}<footer>Copyright © 2026 Nova Code</footer></main>
     <Toast toast={toast} />
     {form && <RecordModal form={form} setForm={setForm} save={save} profile={data.profile} userId={auth.user?.id} />}
   </div>;
@@ -795,7 +851,8 @@ function RecordModal({ form, setForm, save, profile }: {
     weights: [["logged_at", "Date", "date"], ["weight_kg", "Weight", "number"], ["target_weight_kg", "Target", "number"]],
     calendar: [["title", "Event"], ["event_date", "Date", "date"], ["event_type", "Type"], ["reminder_at", "Reminder", "datetime-local"]],
     checklist: [["item", "Item"], ["category", "Category"]],
-    feedback: [["title", "Title"], ["details", "Details"], ["priority", "Priority"]],
+    feedback: [["title", "Title"], ["details", "Details"], ["priority", "Priority", "select", ["low", "normal", "high"]], ["visibility", "Visibility", "select", ["public", "private"]]],
+    roadmap: [["title", "Feature"], ["description", "Description"], ["status", "Status", "select", ["research", "planned", "in-progress", "released"]]],
     verifications: [["document_type", "Proof type", "select", ["school_id", "fee_receipt", "bonafide"]], ["file_path", "Storage file path"], ["status", "Status", "select", ["pending", "approved", "rejected"]]]
   } as Partial<Record<Resource, Array<[string, string, string?, string[]?]>>>)[form.resource] || [];
 

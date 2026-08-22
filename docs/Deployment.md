@@ -15,6 +15,18 @@
    - local equivalents for development, such as `http://localhost:5173/auth/callback`
 9. Configure the Confirm signup email template using `docs/Supabase_Email_Template.html`.
 
+### First Admin Promotion
+
+Newly registered profiles default to the non-admin `user` role. Do not hardcode an admin email in the app. To create the first admin, a Supabase project owner should verify the trusted user's Auth UID and run this in the Supabase SQL Editor:
+
+```sql
+update public.profiles
+set role = 'admin'
+where user_id = 'REPLACE_WITH_TRUSTED_AUTH_USER_ID';
+```
+
+Only run this from the Supabase dashboard or a locked server-side maintenance process. Normal authenticated users cannot update `role`, `plan_id`, `verified_athlete`, or `founder_badge` for themselves because the profile trigger preserves those privileged fields unless the acting user is already an admin.
+
 ## Netlify
 
 1. Create a new Netlify site from GitHub.
@@ -46,8 +58,12 @@ The manual Tournament Scanner uses the signed-in user's JWT and does not require
 - Register a new user.
 - Confirm the email if verification is enabled.
 - Add a profile record.
+- Confirm a normal user does not see Admin Panel navigation and receives Access Denied on `/admin`.
+- Promote one trusted test user with the SQL above, then confirm `/admin` loads for that account.
 - Add a tournament, training session, medal, and weight log.
 - Confirm each table only shows data for the signed-in user.
+- Confirm Roadmap loads for authenticated users, one vote per feature is enforced, and only admins can create/update/delete roadmap items.
+- Confirm Feedback shows public feedback to authenticated users and private feedback only to the owner/admin.
 - Ask the AI coach a training question.
 - Use Tournament Scanner Check Now and confirm it does not create an AI usage event.
 - Confirm scheduled scanner deployment only when `SUPABASE_SERVICE_ROLE_KEY` is present server-side.

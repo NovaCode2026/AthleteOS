@@ -17,7 +17,7 @@ Athlete data is stored in Supabase Postgres with Row Level Security. V2 adds nor
 
 ## Role Model
 
-AthleteOS supports athlete, coach, academy admin, support admin, admin, and super admin roles. The UI hides unavailable actions, while database RLS and future Netlify Functions enforce backend authorization.
+AthleteOS defaults every new account to the non-admin `user` role. Legacy athlete/coach/academy roles remain non-admin, while `support_admin`, `admin`, and `super_admin` unlock the Admin Panel. The UI hides unavailable actions, and Supabase RLS plus server functions enforce backend authorization.
 
 ## AI Boundary
 

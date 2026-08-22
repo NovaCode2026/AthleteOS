@@ -54,7 +54,7 @@ begin
   end if;
 
   if tg_op = 'INSERT' and not public.is_platform_admin() then
-    new.role = 'athlete';
+    new.role = 'user';
     new.plan_id = 'free';
     new.verified_athlete = false;
     new.founder_badge = false;
@@ -102,6 +102,29 @@ begin
   end loop;
 end $$;
 
+drop policy if exists "feedback_items select own rows" on public.feedback_items;
+drop policy if exists "feedback_items insert own rows" on public.feedback_items;
+drop policy if exists "feedback_items update own rows" on public.feedback_items;
+drop policy if exists "feedback_items delete own rows" on public.feedback_items;
+drop policy if exists "feedback public or own read" on public.feedback_items;
+drop policy if exists "feedback submit own" on public.feedback_items;
+drop policy if exists "feedback edit own draft fields" on public.feedback_items;
+drop policy if exists "feedback admin moderate" on public.feedback_items;
+create policy "feedback public or own read" on public.feedback_items
+for select to authenticated
+using (visibility = 'public' or public.owns_row(user_id) or public.is_platform_admin());
+create policy "feedback submit own" on public.feedback_items
+for insert to authenticated
+with check (public.owns_row(user_id) and status = 'new');
+create policy "feedback edit own draft fields" on public.feedback_items
+for update to authenticated
+using (public.owns_row(user_id))
+with check (public.owns_row(user_id) and status = 'new');
+create policy "feedback admin moderate" on public.feedback_items
+for all to authenticated
+using (public.is_platform_admin())
+with check (public.is_platform_admin());
+
 drop policy if exists "profiles insert own rows" on public.profiles;
 drop policy if exists "profiles insert own profile" on public.profiles;
 create policy "profiles insert own profile" on public.profiles
@@ -146,7 +169,7 @@ for all to authenticated using (
 drop policy if exists "roadmap public read" on public.roadmap_items;
 drop policy if exists "roadmap authenticated insert" on public.roadmap_items;
 drop policy if exists "roadmap admin manage" on public.roadmap_items;
-create policy "roadmap public read" on public.roadmap_items for select using (true);
+create policy "roadmap public read" on public.roadmap_items for select to authenticated using (true);
 create policy "roadmap admin manage" on public.roadmap_items for all to authenticated using (public.is_platform_admin()) with check (public.is_platform_admin());
 
 drop policy if exists "roadmap votes read" on public.roadmap_votes;
@@ -192,7 +215,7 @@ create policy "audit logs admin read" on public.audit_logs for select to authent
 create policy "audit logs admin insert" on public.audit_logs for insert to authenticated with check (public.is_platform_admin());
 
 grant usage on schema public to anon, authenticated;
-grant select on public.roadmap_items to anon, authenticated;
+grant select on public.roadmap_items to authenticated;
 grant select on public.announcements to anon, authenticated;
 grant select on public.feature_flags to authenticated;
 

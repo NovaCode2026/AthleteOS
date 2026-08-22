@@ -91,6 +91,15 @@ export async function deleteRow(resource: Resource, id: string, userId?: string)
   if (error) throw toDatabaseError(resource, "delete", error);
 }
 
+export async function updateRow<T extends Record<string, unknown>>(resource: Resource, id: string, values: T, userId?: string) {
+  const table = TABLES[resource];
+  let query = requireSupabase().from(table).update(values).eq("id", id);
+  if (userId) query = query.eq("user_id", userId);
+  const { data, error } = await query.select().single();
+  if (error) throw toDatabaseError(resource, "save", error);
+  return data;
+}
+
 export async function insertManyRows<T extends Record<string, unknown>>(resource: Resource, values: T[]) {
   const table = TABLES[resource];
   const { data, error } = await requireSupabase().from(table).insert(values).select();
