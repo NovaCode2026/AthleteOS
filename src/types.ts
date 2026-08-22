@@ -89,7 +89,10 @@ export interface DocumentRecord {
   user_id?: string;
   title: string;
   document_type: string;
+  issued_at?: string;
+  file_path?: string;
   expires_at?: string;
+  notes?: string;
 }
 
 export interface FeedbackItem {
@@ -116,6 +119,32 @@ export interface RoadmapItem {
   description?: string;
   status?: string;
   votes?: number;
+  user_has_voted?: boolean;
+}
+
+export interface RoadmapVote {
+  id?: string;
+  roadmap_item_id: string;
+  user_id?: string;
+}
+
+export interface TournamentScan {
+  id?: string;
+  user_id?: string;
+  source_url: string;
+  tournament_name?: string;
+  tournament_date?: string;
+  venue?: string;
+  registration_deadline?: string;
+  weigh_in_information?: string;
+  categories?: string;
+  notices?: string;
+  pdfs?: Array<{ href: string; label: string }>;
+  schedules_results?: string;
+  detected_changes?: string;
+  status?: "pending" | "checked" | "blocked" | "failed";
+  last_checked_at?: string;
+  next_check_at?: string;
 }
 
 export interface UsageSummary {
@@ -164,6 +193,8 @@ export interface CloudData {
   feedback: FeedbackItem[];
   verifications: VerificationRequest[];
   roadmap: RoadmapItem[];
+  roadmapVotes: RoadmapVote[];
+  tournamentScans: TournamentScan[];
   aiUsage: AiUsageEvent[];
   subscriptions: Subscription[];
   subscriptionUsage: SubscriptionUsage[];

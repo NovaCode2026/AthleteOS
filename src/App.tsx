@@ -2,22 +2,25 @@ import { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Activity, BadgeCheck, Bell, Calendar, CheckCircle2, CreditCard, FileText, FolderLock,
-  Gauge, HeartPulse, LogOut, Medal, Plus, Shield, Sparkles, Star, Target, Trophy, User, Weight
+  Download, ExternalLink, Gauge, HeartPulse, LogOut, Medal, Plus, RefreshCw, ScanLine, Shield,
+  Sparkles, Star, Target, Trash2, Trophy, Upload, User, Weight
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { isSupabaseConfigured, supabaseConfig } from "./lib/supabase";
-import { deleteRow, insertRow, listRows, upsertRow, type Resource } from "./services/database";
+import {
+  createSignedFileUrl, deletePrivateFile, deleteRow, insertRow, listRows, uploadPrivateFile, upsertRow, type Resource
+} from "./services/database";
 import { plans, getPlan } from "./config/plans";
 import type {
   ChecklistItem, CloudData, DocumentRecord, FeedbackItem, Goal, Medal as MedalRecord,
-  AiUsageEvent, Profile, RoadmapItem, Subscription, SubscriptionUsage, TrainingSession, Tournament, UsageSummary, VerificationRequest, WeightLog
+  AiUsageEvent, Profile, RoadmapItem, RoadmapVote, Subscription, SubscriptionUsage, TournamentScan, TrainingSession, Tournament, UsageSummary, VerificationRequest, WeightLog
 } from "./types";
 import "./styles/main.css";
 
-type PageId = "dashboard" | "profile" | "plans" | "verification" | "tournaments" | "training" | "medals" | "documents" | "weight" | "calendar" | "checklist" | "ai" | "feedback" | "roadmap" | "admin";
+type PageId = "dashboard" | "profile" | "plans" | "verification" | "tournaments" | "training" | "medals" | "documents" | "weight" | "calendar" | "checklist" | "scanner" | "ai" | "feedback" | "roadmap" | "admin";
 type ToastState = { type: "success" | "error" | "warning"; message: string } | null;
 type AdminRole = "support_admin" | "admin" | "super_admin";
 type AuthMode = "login" | "register" | "forgot" | "reset";
@@ -35,6 +38,7 @@ const nav: Array<[PageId, string, typeof Activity]> = [
   ["documents", "Documents", FolderLock],
   ["weight", "Weight", Weight],
   ["checklist", "Checklist", CheckCircle2],
+  ["scanner", "Scanner", ScanLine],
   ["ai", "AI Coach", Sparkles],
   ["feedback", "Feedback", HeartPulse],
   ["roadmap", "Roadmap", Target],
@@ -47,6 +51,10 @@ function isAdminProfile(profile: Profile) {
 
 function isPasswordResetRoute() {
   return window.location.pathname === "/reset-password";
+}
+
+function isAuthCallbackRoute() {
+  return window.location.pathname === "/auth/callback";
 }
 
 function sanitizeProfileValues(values: Partial<Profile>) {
@@ -78,12 +86,6 @@ function sanitizeProfileValues(values: Partial<Profile>) {
   return safeValues;
 }
 
-const fallbackRoadmap: RoadmapItem[] = [
-  { title: "Athlete Resume PDF", description: "Generate a polished verified athlete resume from profile, medals, and certificates.", status: "planned", votes: 24 },
-  { title: "AI Credit Packs", description: "Allow extra AI coach usage beyond monthly plan limits.", status: "research", votes: 18 },
-  { title: "Academy Team Console", description: "Coach-facing roster, verification, and analytics tools.", status: "in-progress", votes: 31 }
-];
-
 function Field({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
   return <label className="field"><span>{label}</span><input {...props} /></label>;
 }
@@ -96,19 +98,49 @@ function Toast({ toast }: { toast: ToastState }) {
   return toast ? <div className={`toast ${toast.type}`} role="status">{toast.message}</div> : null;
 }
 
+function VerificationCallback() {
+  const auth = useAuth();
+  const params = new URLSearchParams(window.location.search);
+  const errorDescription = params.get("error_description") || params.get("error");
+
+  useEffect(() => {
+    if (auth.user) {
+      const target = auth.emailVerified ? "/" : "/onboarding";
+      window.history.replaceState(null, "", target);
+    }
+  }, [auth.user, auth.emailVerified]);
+
+  if (errorDescription) {
+    return <main className="auth-page"><section className="auth-card">
+      <span className="eyebrow">AthleteOS verification</span>
+      <h1>Verification link could not be used</h1>
+      <p>The link may be expired, already used, or malformed. Return to login and request a new verification email if needed.</p>
+      <p className="notice" role="alert">{errorDescription.includes("expired") ? "This verification link has expired." : "Email verification could not be completed."}</p>
+    </section></main>;
+  }
+
+  return <main className="auth-page"><section className="auth-card">
+    <span className="eyebrow">AthleteOS verification</span>
+    <h1>{auth.emailVerified ? "Email verified" : "Finishing verification..."}</h1>
+    <p>{auth.emailVerified ? "Your email is verified. Redirecting you back to AthleteOS." : "Please wait while AthleteOS confirms your email session."}</p>
+  </section></main>;
+}
+
 function AuthScreen({ initialMode }: { initialMode?: AuthMode }) {
   const auth = useAuth();
   const [mode, setMode] = useState<AuthMode>(initialMode || (isPasswordResetRoute() ? "reset" : "login"));
   const [form, setForm] = useState({ email: "", password: "", name: "" });
   const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setMessage("");
+    setBusy(true);
     try {
       if (mode === "register") {
         await auth.signUp({ email: form.email, password: form.password, metadata: { full_name: form.name } });
-        setMessage("Registration started. Check your email to verify your account.");
+        setMessage("Check your email for the AthleteOS verification link. After verifying, you will return here automatically.");
       } else if (mode === "forgot") {
         await auth.resetPassword(form.email);
         setMessage("Password reset email sent.");
@@ -122,6 +154,24 @@ function AuthScreen({ initialMode }: { initialMode?: AuthMode }) {
       }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Authentication failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resendVerification() {
+    if (!form.email.trim()) {
+      setMessage("Enter your email address first.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await auth.resendVerification(form.email);
+      setMessage("A new AthleteOS verification email has been sent.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Verification email could not be resent.");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -144,13 +194,14 @@ function AuthScreen({ initialMode }: { initialMode?: AuthMode }) {
         {mode !== "reset" && <Field label="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />}
         {mode !== "forgot" && <Field label="Password" type="password" minLength={8} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />}
         <label className="remember"><input type="checkbox" defaultChecked /> Remember me on this device</label>
-        <button className="btn primary">{mode === "register" ? "Create account" : mode === "forgot" ? "Send reset email" : mode === "reset" ? "Update password" : "Log in"}</button>
+        <button className="btn primary" disabled={busy}>{busy ? "Please wait..." : mode === "register" ? "Create account" : mode === "forgot" ? "Send reset email" : mode === "reset" ? "Update password" : "Log in"}</button>
       </form>
       {message && <p className="notice" role="status">{message}</p>}
       <div className="auth-links">
         <button onClick={() => setMode("login")}>Login</button>
         <button onClick={() => setMode("register")}>Register</button>
         <button onClick={() => setMode("forgot")}>Forgot password</button>
+        {mode === "register" && <button onClick={resendVerification} disabled={busy}>Resend verification</button>}
         {mode === "reset" && <button onClick={() => setMode("reset")}>Reset password</button>}
       </div>
     </section>
@@ -183,7 +234,9 @@ function useCloudData(userId: string | undefined, setToast: (toast: ToastState) 
     notifications: [],
     feedback: [],
     verifications: [],
-    roadmap: fallbackRoadmap,
+    roadmap: [],
+    roadmapVotes: [],
+    tournamentScans: [],
     aiUsage: [],
     subscriptions: [],
     subscriptionUsage: []
@@ -211,7 +264,7 @@ function useCloudData(userId: string | undefined, setToast: (toast: ToastState) 
       const profileComplete = Boolean(savedProfile?.full_name?.trim());
       const profile = savedProfile || { user_id: userId, plan_id: "free", role: "athlete" };
 
-      const [tournaments, training, medals, weights, goals, checklist, documents, notifications, feedback, verifications, roadmapRows, aiUsage, subscriptions, subscriptionUsage] = await Promise.all([
+      const [tournaments, training, medals, weights, goals, checklist, documents, notifications, feedback, verifications, roadmapRows, roadmapVotes, tournamentScans, aiUsage, subscriptions, subscriptionUsage] = await Promise.all([
         loadUserRows<Tournament>("tournaments", { order: "starts_at", ascending: true }),
         loadUserRows<TrainingSession>("training", { order: "session_date", ascending: false }),
         loadUserRows<MedalRecord>("medals", { order: "awarded_at", ascending: false }),
@@ -224,8 +277,10 @@ function useCloudData(userId: string | undefined, setToast: (toast: ToastState) 
         loadUserRows<VerificationRequest>("verifications", { order: "created_at" }),
         listRows<RoadmapItem>("roadmap", undefined, { order: "votes", publicRows: true }).catch((error) => {
           dataErrors.push(error instanceof Error ? error.message : "Unable to load roadmap.");
-          return fallbackRoadmap;
+          return [] as RoadmapItem[];
         }),
+        loadUserRows<RoadmapVote>("roadmapVotes", { order: "created_at" }),
+        loadUserRows<TournamentScan>("tournamentScans", { order: "last_checked_at" }),
         loadUserRows<AiUsageEvent>("aiUsage", { order: "created_at" }),
         loadUserRows<Subscription>("subscriptions", { order: "created_at" }),
         loadUserRows<SubscriptionUsage>("subscriptionUsage", { order: "usage_month" })
@@ -244,7 +299,12 @@ function useCloudData(userId: string | undefined, setToast: (toast: ToastState) 
         notifications,
         feedback,
         verifications,
-        roadmap: roadmapRows.length ? roadmapRows : fallbackRoadmap,
+        roadmap: roadmapRows.map((item) => ({
+          ...item,
+          user_has_voted: roadmapVotes.some((vote) => vote.roadmap_item_id === item.id)
+        })),
+        roadmapVotes,
+        tournamentScans,
         aiUsage,
         subscriptions,
         subscriptionUsage
@@ -267,6 +327,28 @@ function useCloudData(userId: string | undefined, setToast: (toast: ToastState) 
 
 function FeaturePage({ title, actions, children }: { title: string; actions?: React.ReactNode; children: React.ReactNode }) {
   return <><div className="page-head"><div><p className="eyebrow">AthleteOS V2</p><h2>{title}</h2></div>{actions}</div>{children}</>;
+}
+
+function documentStatus(expiresAt?: string) {
+  if (!expiresAt) return { label: "Valid", tone: "success" };
+  const today = new Date();
+  const expiry = new Date(`${expiresAt}T00:00:00`);
+  const days = Math.ceil((expiry.getTime() - today.getTime()) / 86400000);
+  if (days < 0) return { label: "Expired", tone: "error" };
+  if (days <= 30) return { label: "Expiring soon", tone: "warning" };
+  return { label: "Valid", tone: "success" };
+}
+
+function scanIntervalHours(planId?: string) {
+  return ({ free: 12, student: 6, pro: 3, champion: 1, academy: 0.5 } as Record<string, number>)[planId || "free"] ?? 12;
+}
+
+function safeHost(url: string) {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
 }
 
 function Dashboard({ data, usage, openForm }: { data: CloudData; usage: UsageSummary; openForm: (resource: Resource) => void }) {
@@ -389,6 +471,115 @@ function AiCoach({ usage, accessToken, setToast }: { usage: UsageSummary; access
   </FeaturePage>;
 }
 
+function DocumentsPage({ rows, openForm, openDocument, removeDocument }: {
+  rows: DocumentRecord[];
+  openForm: (resource: Resource) => void;
+  openDocument: (document: DocumentRecord) => Promise<void>;
+  removeDocument: (document: DocumentRecord) => Promise<void>;
+}) {
+  return <FeaturePage title="Secure Documents" actions={<button className="btn primary" onClick={() => openForm("documents")}><Upload size={16} /> Add document</button>}>
+    <section className="card panel">
+      <p>Upload private athlete documents to Supabase Storage. Files are stored under your user folder and protected by Storage RLS.</p>
+      <DataTable rows={rows} empty="No documents yet" columns={[
+        { key: "title", label: "Document" },
+        { key: "document_type", label: "Type" },
+        { key: "issued_at", label: "Issued" },
+        { key: "expires_at", label: "Expiry" },
+        { key: "status", label: "Status", render: (row) => {
+          const status = documentStatus(row.expires_at);
+          return <span className={`status-chip ${status.tone}`}>{status.label}</span>;
+        } },
+        { key: "actions", label: "", render: (row) => <div className="inline-actions">
+          <button className="plain" onClick={() => void openDocument(row)} disabled={!row.file_path}><Download size={14} /> Open</button>
+          <button className="plain danger" onClick={() => void removeDocument(row)}><Trash2 size={14} /> Delete</button>
+        </div> }
+      ]} />
+    </section>
+  </FeaturePage>;
+}
+
+function RoadmapPage({ rows, vote }: { rows: RoadmapItem[]; vote: (item: RoadmapItem) => Promise<void> }) {
+  return <FeaturePage title="Public roadmap">
+    <section className="card panel">
+      <p>Votes are stored in Supabase. Each authenticated user can vote once per feature; totals are maintained by the database.</p>
+      <DataTable rows={rows} empty="Roadmap is being prepared" columns={[
+        { key: "title", label: "Feature" },
+        { key: "status", label: "Status" },
+        { key: "votes", label: "Votes" },
+        { key: "vote", label: "", render: (row) => <button className="btn" disabled={row.user_has_voted} onClick={() => void vote(row)}>{row.user_has_voted ? "Voted" : "Vote"}</button> }
+      ]} />
+    </section>
+  </FeaturePage>;
+}
+
+function TournamentScannerPage({ scans, planId, accessToken, refresh, setToast }: {
+  scans: TournamentScan[];
+  planId?: string;
+  accessToken?: string;
+  refresh: () => Promise<void>;
+  setToast: (toast: ToastState) => void;
+}) {
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [checking, setChecking] = useState(false);
+  const hours = scanIntervalHours(planId);
+  const nextScan = scans
+    .map((scan) => scan.next_check_at ? new Date(scan.next_check_at) : null)
+    .filter(Boolean)
+    .sort((a, b) => Number(a) - Number(b))[0];
+
+  async function checkNow(event: React.FormEvent) {
+    event.preventDefault();
+    if (!sourceUrl.trim()) {
+      setToast({ type: "warning", message: "Enter a tournament source URL first." });
+      return;
+    }
+    if (!accessToken) {
+      setToast({ type: "error", message: "Please sign in again before scanning." });
+      return;
+    }
+    setChecking(true);
+    try {
+      const response = await fetch("/.netlify/functions/tournament-scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ sourceUrl })
+      });
+      const payload = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || "Tournament scan failed.");
+      setToast({ type: "success", message: "Tournament source checked without using AI." });
+      await refresh();
+    } catch (error) {
+      setToast({ type: "error", message: error instanceof Error ? error.message : "Tournament source could not be checked." });
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  return <FeaturePage title="Tournament Scanner">
+    <section className="card scan">
+      <span className="scanner"><ScanLine className="icon" /></span>
+      <div>
+        <h3>Non-AI tournament monitoring</h3>
+        <p>Manual Check Now uses the browser/app connection and a secure server function. It does not consume AI usage. Automatic checks require a scheduled backend worker; a browser/PWA cannot reliably run jobs while closed.</p>
+        <p>Current plan interval: every {hours === 0.5 ? "30 minutes" : `${hours} hours`}. Next automatic check: {nextScan ? nextScan.toLocaleString() : "after your first scan"}.</p>
+        <form className="inline-form" onSubmit={checkNow}>
+          <input type="url" placeholder="https://example.com/tournament-notice" value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} required />
+          <button className="btn primary" disabled={checking}><RefreshCw size={16} /> {checking ? "Checking..." : "Check Now"}</button>
+        </form>
+      </div>
+    </section>
+    <DataTable rows={scans} empty="No tournament sources scanned yet" columns={[
+      { key: "source_url", label: "Source", render: (row) => <a href={row.source_url} target="_blank" rel="noreferrer"><ExternalLink size={14} /> {safeHost(row.source_url)}</a> },
+      { key: "tournament_name", label: "Tournament" },
+      { key: "tournament_date", label: "Date" },
+      { key: "venue", label: "Venue" },
+      { key: "last_checked_at", label: "Last checked" },
+      { key: "detected_changes", label: "Changes" },
+      { key: "status", label: "Status" }
+    ]} />
+  </FeaturePage>;
+}
+
 function AdminPage({ data }: { data: CloudData }) {
   return <FeaturePage title="Admin command center">
     <section className="metrics">
@@ -477,6 +668,14 @@ function AppShell() {
     try {
       const user_id = auth.user?.id;
       if (!user_id && resource !== "roadmap") throw new Error("You must be logged in.");
+      if (resource === "training" && (!values.title || !values.session_date || !values.minutes)) {
+        throw new Error("Training title, date, and minutes are required.");
+      }
+      if (resource === "tournaments" && !values.name) throw new Error("Tournament name is required.");
+      if (resource === "medals" && (!values.event_name || !values.medal_type)) throw new Error("Event and medal type are required.");
+      if (resource === "weights" && (!values.logged_at || !values.weight_kg)) throw new Error("Weight date and value are required.");
+      if (resource === "documents" && (!values.title || !values.document_type)) throw new Error("Document name and type are required.");
+      if (resource === "feedback" && !values.title) throw new Error("Feedback title is required.");
       if (resource === "profile") {
         const safeValues = sanitizeProfileValues(values as Partial<Profile>);
         await upsertRow("profile", { ...safeValues, user_id }, { onConflict: "user_id" });
@@ -492,6 +691,43 @@ function AppShell() {
     } catch (error) {
       setToast({ type: "error", message: error instanceof Error ? error.message : "Save failed." });
       if (options.rethrow) throw error;
+    }
+  }
+
+  async function openDocument(document: DocumentRecord) {
+    if (!document.file_path) {
+      setToast({ type: "warning", message: "This document has metadata but no uploaded file yet." });
+      return;
+    }
+    try {
+      const signedUrl = await createSignedFileUrl("documents", document.file_path);
+      window.open(signedUrl, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      setToast({ type: "error", message: error instanceof Error ? error.message : "Unable to open document." });
+    }
+  }
+
+  async function removeDocument(document: DocumentRecord) {
+    try {
+      if (document.file_path) await deletePrivateFile("documents", document.file_path);
+      await remove("documents", document.id);
+    } catch (error) {
+      setToast({ type: "error", message: error instanceof Error ? error.message : "Unable to delete document." });
+    }
+  }
+
+  async function voteRoadmap(item: RoadmapItem) {
+    if (!item.id || !auth.user?.id) {
+      setToast({ type: "error", message: "Please sign in before voting." });
+      return;
+    }
+    try {
+      await insertRow("roadmapVotes", { roadmap_item_id: item.id, user_id: auth.user.id });
+      setToast({ type: "success", message: "Vote recorded." });
+      await refresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      setToast({ type: "warning", message: message.toLowerCase().includes("duplicate") ? "You have already voted for this feature." : "Vote could not be recorded." });
     }
   }
 
@@ -522,20 +758,21 @@ function AppShell() {
   else if (page === "tournaments") content = <FeaturePage title="Tournaments" actions={<button className="btn primary" onClick={() => openForm("tournaments")}><Plus size={16} /> Add</button>}><DataTable rows={data.tournaments} empty="No tournaments yet" columns={[{ key: "name", label: "Tournament" }, { key: "starts_at", label: "Date" }, { key: "location", label: "Location" }, { key: "status", label: "Status" }, { key: "remove", label: "", render: (row) => <button className="plain danger" onClick={() => remove("tournaments", row.id)}>Delete</button> }]} /></FeaturePage>;
   else if (page === "training") content = <FeaturePage title="Training Sessions" actions={<button className="btn primary" onClick={() => openForm("training")}><Plus size={16} /> Log</button>}><DataTable rows={data.training} empty="No training sessions yet" columns={[{ key: "title", label: "Session" }, { key: "session_date", label: "Date" }, { key: "minutes", label: "Minutes" }, { key: "intensity", label: "Intensity" }]} /></FeaturePage>;
   else if (page === "medals") content = <FeaturePage title="Medals" actions={<button className="btn primary" onClick={() => openForm("medals")}><Plus size={16} /> Add</button>}><DataTable rows={data.medals} empty="No medals yet" columns={[{ key: "event_name", label: "Event" }, { key: "medal_type", label: "Medal" }, { key: "category", label: "Category" }, { key: "awarded_at", label: "Date" }]} /></FeaturePage>;
-  else if (page === "documents") content = <FeaturePage title="Secure Documents" actions={<button className="btn primary" onClick={() => openForm("documents")}><Plus size={16} /> Add</button>}><DataTable rows={data.documents} empty="No documents yet" columns={[{ key: "title", label: "Document" }, { key: "document_type", label: "Type" }, { key: "expires_at", label: "Expiry" }]} /></FeaturePage>;
+  else if (page === "documents") content = <DocumentsPage rows={data.documents} openForm={openForm} openDocument={openDocument} removeDocument={removeDocument} />;
   else if (page === "weight") content = <FeaturePage title="Weight Tracker" actions={<button className="btn primary" onClick={() => openForm("weights")}><Plus size={16} /> Log</button>}><section className="card panel"><ResponsiveContainer width="100%" height={320}><LineChart data={data.weights}><CartesianGrid strokeDasharray="3 3" stroke="#25405f" /><XAxis dataKey="logged_at" /><YAxis /><Tooltip /><Line type="monotone" dataKey="weight_kg" stroke="#52ddac" strokeWidth={3} /></LineChart></ResponsiveContainer></section></FeaturePage>;
   else if (page === "calendar") content = <FeaturePage title="Calendar"><DataTable rows={data.training.map((item) => ({ ...item, event_type: "training" })).concat(data.tournaments.map((item) => ({ id: item.id, title: item.name, session_date: item.starts_at || "", event_type: "competition", minutes: 0 })))} empty="No calendar events" columns={[{ key: "title", label: "Event" }, { key: "session_date", label: "Date" }, { key: "event_type", label: "Type" }]} /></FeaturePage>;
   else if (page === "checklist") content = <FeaturePage title="Competition Checklist" actions={<button className="btn primary" onClick={() => openForm("checklist")}><Plus size={16} /> Add</button>}><section className="card checklist">{data.checklist.map((item) => <label key={item.id || item.item}><input type="checkbox" checked={Boolean(item.completed)} readOnly /> {item.item}<span>{item.category}</span></label>)}</section></FeaturePage>;
+  else if (page === "scanner") content = <TournamentScannerPage scans={data.tournamentScans} planId={plan.id} accessToken={auth.session?.access_token} refresh={refresh} setToast={setToast} />;
   else if (page === "ai") content = <AiCoach usage={usage} accessToken={auth.session?.access_token} setToast={setToast} />;
   else if (page === "feedback") content = <FeaturePage title="Feedback portal" actions={<button className="btn primary" onClick={() => openForm("feedback")}><Plus size={16} /> Submit feedback</button>}><DataTable rows={data.feedback} empty="No feedback yet" columns={[{ key: "title", label: "Title" }, { key: "status", label: "Status" }, { key: "priority", label: "Priority" }]} /></FeaturePage>;
-  else if (page === "roadmap") content = <FeaturePage title="Public roadmap"><DataTable rows={data.roadmap} empty="Roadmap is being prepared" columns={[{ key: "title", label: "Feature" }, { key: "status", label: "Status" }, { key: "votes", label: "Votes" }]} /></FeaturePage>;
+  else if (page === "roadmap") content = <RoadmapPage rows={data.roadmap} vote={voteRoadmap} />;
   else if (page === "admin") content = isAdmin ? <AdminPage data={data} /> : <FeaturePage title="Access denied"><section className="card panel"><h3>Admin access required</h3><p>Your account is not authorized to view admin operations.</p></section></FeaturePage>;
 
   return <div className="app-shell">
     <aside className="sidebar"><div className="brand"><Shield /> <span>Athlete<span>OS</span></span></div><p className="edition">Taekwondo Edition V2</p><nav>{visibleNav.map(([id, label, Icon]) => <button key={id} className={id === page ? "active" : ""} onClick={() => setPage(id)}><Icon size={18} /> {label}</button>)}</nav><button className="logout" onClick={auth.signOut}><LogOut size={16} /> Logout</button></aside>
     <main><header><div><p className="eyebrow">Nova Code Cloud</p><h1>{current?.[1] || "Dashboard"}</h1></div><button className="icon-btn" aria-label="Notifications"><Bell size={18} /></button></header>{!auth.emailVerified && <div className="card panel verify-banner"><BadgeCheck /><span>Please verify your email to unlock full account trust features.</span></div>}{content}<footer>Copyright © 2026 Nova Code</footer></main>
     <Toast toast={toast} />
-    {form && <RecordModal form={form} setForm={setForm} save={save} profile={data.profile} />}
+    {form && <RecordModal form={form} setForm={setForm} save={save} profile={data.profile} userId={auth.user?.id} />}
   </div>;
 }
 
@@ -544,14 +781,17 @@ function RecordModal({ form, setForm, save, profile }: {
   setForm: (form: null) => void;
   save: (resource: Resource, values: Record<string, string | number | boolean>) => Promise<void>;
   profile: Profile;
+  userId?: string;
 }) {
   const [values, setValues] = useState<Record<string, string | number | boolean>>(form.resource === "profile" ? profile as Record<string, string | number | boolean> : {});
+  const [file, setFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
   const fields: Array<[string, string, string?, string[]?]> = ({
     profile: [["full_name", "Name"], ["date_of_birth", "Date of birth", "date"], ["weight_kg", "Weight", "number"], ["height_cm", "Height", "number"], ["belt", "Belt"], ["academy", "Academy"], ["coach", "Coach"], ["emergency_contact", "Emergency contact"]],
     tournaments: [["name", "Tournament"], ["starts_at", "Date", "date"], ["location", "Location"], ["status", "Status"], ["opponent_notes", "Opponent notes"], ["match_notes", "Match notes"]],
     training: [["title", "Session"], ["session_date", "Date", "date"], ["minutes", "Minutes", "number"], ["intensity", "Intensity"]],
     medals: [["event_name", "Event"], ["medal_type", "Medal"], ["category", "Category"], ["awarded_at", "Date", "date"]],
-    documents: [["title", "Document"], ["document_type", "Type"], ["expires_at", "Expiry", "date"]],
+    documents: [["title", "Document name"], ["document_type", "Type"], ["issued_at", "Issue date", "date"], ["expires_at", "Expiry date", "date"], ["notes", "Notes"]],
     weights: [["logged_at", "Date", "date"], ["weight_kg", "Weight", "number"], ["target_weight_kg", "Target", "number"]],
     calendar: [["title", "Event"], ["event_date", "Date", "date"], ["event_type", "Type"], ["reminder_at", "Reminder", "datetime-local"]],
     checklist: [["item", "Item"], ["category", "Category"]],
@@ -559,12 +799,30 @@ function RecordModal({ form, setForm, save, profile }: {
     verifications: [["document_type", "Proof type", "select", ["school_id", "fee_receipt", "bonafide"]], ["file_path", "Storage file path"], ["status", "Status", "select", ["pending", "approved", "rejected"]]]
   } as Partial<Record<Resource, Array<[string, string, string?, string[]?]>>>)[form.resource] || [];
 
-  return <div className="modal-backdrop"><form className="modal" onSubmit={(event) => { event.preventDefault(); void save(form.resource, values); }}><button type="button" className="close" onClick={() => setForm(null)} aria-label="Close">x</button><h2>{form.resource}</h2>{fields.map(([name, label, type = "text", options]) => options ? <SelectField key={name} label={label} value={String(values[name] || "")} onChange={(event) => setValues({ ...values, [name]: event.target.value })}><option value="">Select</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</SelectField> : <Field key={name} label={label} type={type} value={String(values[name] || "")} onChange={(event) => setValues({ ...values, [name]: type === "number" ? Number(event.target.value) : event.target.value })} />)}<button className="btn primary">Save</button></form></div>;
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      const payload = { ...values };
+      if (form.resource === "documents" && file) {
+        if (!userId) throw new Error("Please sign in again before uploading.");
+        const extension = file.name.includes(".") ? file.name.split(".").pop() : "bin";
+        const safeName = `${crypto.randomUUID()}.${extension}`;
+        payload.file_path = await uploadPrivateFile("documents", `${userId}/${safeName}`, file);
+      }
+      await save(form.resource, payload);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return <div className="modal-backdrop"><form className="modal" onSubmit={(event) => { void submit(event); }}><button type="button" className="close" onClick={() => setForm(null)} aria-label="Close">x</button><h2>{form.resource}</h2>{fields.map(([name, label, type = "text", options]) => options ? <SelectField key={name} label={label} value={String(values[name] || "")} onChange={(event) => setValues({ ...values, [name]: event.target.value })}><option value="">Select</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</SelectField> : <Field key={name} label={label} type={type} value={String(values[name] || "")} onChange={(event) => setValues({ ...values, [name]: type === "number" ? Number(event.target.value) : event.target.value })} />)}{form.resource === "documents" && <label className="field"><span>Upload file</span><input type="file" onChange={(event) => setFile(event.target.files?.[0] || null)} /></label>}<button className="btn primary" disabled={saving}>{saving ? "Saving..." : "Save"}</button></form></div>;
 }
 
 function ProtectedApp() {
   const auth = useAuth();
   if (auth.loading) return <main className="auth-page"><section className="auth-card">Loading secure session...</section></main>;
+  if (isAuthCallbackRoute()) return <VerificationCallback />;
   if (isPasswordResetRoute()) return <AuthScreen initialMode="reset" />;
   return auth.user ? <AppShell /> : <AuthScreen />;
 }

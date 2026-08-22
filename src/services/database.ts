@@ -21,6 +21,8 @@ export const TABLES = {
   feedback: "feedback_items",
   verifications: "student_verifications",
   roadmap: "roadmap_items",
+  roadmapVotes: "roadmap_votes",
+  tournamentScans: "tournament_scans",
   referrals: "referrals",
   badges: "athlete_badges",
   aiUsage: "ai_usage_events",
@@ -46,7 +48,11 @@ function extractDatabaseMessage(error: unknown) {
 
 function toDatabaseError(resource: Resource, action: string, error: unknown) {
   const detail = extractDatabaseMessage(error);
-  const safeDetail = import.meta.env.DEV ? ` ${detail}` : " Please try again later.";
+  const safeDetail = import.meta.env.DEV
+    ? ` ${detail}`
+    : action === "save"
+      ? " Please check the fields and try again."
+      : " Please try again later.";
   return new Error(`Unable to ${action} ${resource}.${safeDetail}`);
 }
 
@@ -85,11 +91,29 @@ export async function deleteRow(resource: Resource, id: string, userId?: string)
   if (error) throw toDatabaseError(resource, "delete", error);
 }
 
+export async function insertManyRows<T extends Record<string, unknown>>(resource: Resource, values: T[]) {
+  const table = TABLES[resource];
+  const { data, error } = await requireSupabase().from(table).insert(values).select();
+  if (error) throw toDatabaseError(resource, "save", error);
+  return data;
+}
+
 export async function uploadPrivateFile(bucket: string, path: string, file: File) {
   const { data, error } = await requireSupabase().storage.from(bucket).upload(path, file, {
     upsert: true,
     cacheControl: "3600"
   });
-  if (error) throw error;
+  if (error) throw new Error(import.meta.env.DEV ? error.message : "Unable to upload the file securely. Please try again.");
   return data.path;
+}
+
+export async function createSignedFileUrl(bucket: string, path: string) {
+  const { data, error } = await requireSupabase().storage.from(bucket).createSignedUrl(path, 60);
+  if (error) throw new Error(import.meta.env.DEV ? error.message : "Unable to open this document right now.");
+  return data.signedUrl;
+}
+
+export async function deletePrivateFile(bucket: string, path: string) {
+  const { error } = await requireSupabase().storage.from(bucket).remove([path]);
+  if (error) throw new Error(import.meta.env.DEV ? error.message : "Unable to delete the stored file.");
 }

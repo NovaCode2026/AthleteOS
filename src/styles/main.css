@@ -391,7 +391,8 @@ th {
 .ai-panel select,
 .ai-panel textarea,
 .field input,
-.field select {
+.field select,
+.inline-form input {
   width: 100%;
   border: 1px solid #2b4a6b;
   border-radius: var(--radius);
@@ -455,6 +456,27 @@ th {
 
 .toast.error { border-color: var(--red); }
 .toast.success { border-color: var(--green); }
+.toast.warning { border-color: var(--amber); }
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius);
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.status-chip.success { color: var(--green); background: rgba(82, 221, 172, 0.1); }
+.status-chip.warning { color: var(--amber); background: rgba(247, 199, 106, 0.1); }
+.status-chip.error { color: var(--red); background: rgba(255, 125, 141, 0.1); }
+
+.inline-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 10px;
+  margin-top: 14px;
+}
 
 .skeleton {
   padding: 32px;
@@ -537,4 +559,5 @@ th {
 
 @media (max-width: 720px) {
   .plan-grid { grid-template-columns: 1fr; }
+  .inline-form { grid-template-columns: 1fr; }
 }

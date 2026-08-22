@@ -1,0 +1,33 @@
+<!--
+AthleteOS confirmation email template for Supabase Auth.
+Configure in Supabase Dashboard > Authentication > Email Templates > Confirm signup.
+Redirect URL used by the app: {{ .ConfirmationURL }} with emailRedirectTo /auth/callback.
+-->
+<div style="margin:0;padding:0;background:#06101f;font-family:Inter,Arial,sans-serif;color:#eef6ff;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#06101f;padding:32px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#0c1d32;border:1px solid rgba(164,203,255,.16);border-radius:14px;overflow:hidden;">
+          <tr>
+            <td style="padding:28px 28px 10px;">
+              <p style="margin:0 0 8px;color:#74b9ff;font-size:12px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;">Nova Code</p>
+              <h1 style="margin:0;color:#ffffff;font-size:28px;line-height:1.2;">Verify your AthleteOS account</h1>
+              <p style="margin:14px 0 0;color:#9fb2c8;font-size:15px;line-height:1.6;">Welcome to AthleteOS – Taekwondo Edition. Confirm your email to continue securely into onboarding and your athlete dashboard.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:18px 28px 28px;">
+              <a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#238eff;color:#ffffff;text-decoration:none;font-weight:800;border-radius:10px;padding:13px 18px;">Verify email</a>
+              <p style="margin:20px 0 0;color:#9fb2c8;font-size:13px;line-height:1.5;">If the button does not work, copy and paste this link into your browser:</p>
+              <p style="word-break:break-all;color:#91d8ff;font-size:12px;line-height:1.5;">{{ .ConfirmationURL }}</p>
+              <p style="margin:22px 0 0;color:#7891ad;font-size:12px;line-height:1.5;">If you did not create an AthleteOS account, you can safely ignore this email.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:18px 28px;background:#09172a;color:#7891ad;font-size:12px;">Copyright © 2026 Nova Code</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</div>

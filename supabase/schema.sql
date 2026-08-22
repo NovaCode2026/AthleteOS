@@ -1,7 +1,7 @@
 create extension if not exists "pgcrypto";
 
 create or replace function public.set_updated_at()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path = public as $$
 begin
   new.updated_at = now();
   return new;
@@ -152,11 +152,16 @@ create table if not exists public.documents (
   user_id uuid not null references auth.users(id) on delete cascade,
   title text not null,
   document_type text not null,
+  issued_at date,
   file_path text,
   expires_at date,
+  notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.documents add column if not exists issued_at date;
+alter table public.documents add column if not exists notes text;
 
 create table if not exists public.weight_logs (
   id uuid primary key default gen_random_uuid(),
@@ -259,6 +264,37 @@ create table if not exists public.roadmap_items (
   votes integer not null default 0 check (votes >= 0),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
+);
+
+create table if not exists public.roadmap_votes (
+  id uuid primary key default gen_random_uuid(),
+  roadmap_item_id uuid not null references public.roadmap_items(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (roadmap_item_id, user_id)
+);
+
+create table if not exists public.tournament_scans (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  source_url text not null,
+  tournament_name text,
+  tournament_date date,
+  venue text,
+  registration_deadline date,
+  weigh_in_information text,
+  categories text,
+  notices text,
+  pdfs jsonb not null default '[]',
+  schedules_results text,
+  source_hash text,
+  detected_changes text,
+  status text not null default 'pending' check (status in ('pending','checked','blocked','failed')),
+  last_checked_at timestamptz,
+  next_check_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, source_url)
 );
 
 create table if not exists public.ai_usage_events (
@@ -384,6 +420,8 @@ create index if not exists idx_notifications_user_read on public.notifications(u
 create index if not exists idx_student_verifications_user_status on public.student_verifications(user_id, status);
 create index if not exists idx_feedback_items_user_status on public.feedback_items(user_id, status);
 create index if not exists idx_roadmap_items_status_votes on public.roadmap_items(status, votes desc);
+create index if not exists idx_roadmap_votes_item_user on public.roadmap_votes(roadmap_item_id, user_id);
+create index if not exists idx_tournament_scans_user_next on public.tournament_scans(user_id, next_check_at);
 create index if not exists idx_ai_usage_events_user_created on public.ai_usage_events(user_id, created_at desc);
 create index if not exists idx_subscription_usage_user_month on public.subscription_usage(user_id, usage_month desc);
 create index if not exists idx_payment_events_user_created on public.payment_events(user_id, created_at desc);
@@ -397,7 +435,7 @@ begin
   foreach table_name in array array[
     'profiles','academies','academy_memberships','training_sessions','training_plans','attendance_records','tournaments','matches','medals','certificates','documents',
     'weight_logs','calendar_events','notifications','competition_checklists','injuries','goals',
-    'student_verifications','feedback_items','roadmap_items','subscriptions','subscription_usage','referrals',
+    'student_verifications','feedback_items','roadmap_items','tournament_scans','subscriptions','subscription_usage','referrals',
     'support_tickets','announcements','feature_flags'
   ] loop
     execute format('drop trigger if exists set_%s_updated_at on public.%I', table_name, table_name);

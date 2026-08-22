@@ -21,6 +21,7 @@ interface AuthContextValue {
   signUp: (credentials: SignUpCredentials) => Promise<void>;
   signIn: (credentials: Credentials) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  resendVerification: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -42,6 +43,12 @@ function toSafeAuthError(error: unknown, fallback: string) {
   }
   if (lower.includes("already registered") || lower.includes("already exists")) {
     return new Error("An account with this email may already exist. Try logging in or resetting your password.");
+  }
+  if (lower.includes("expired") || lower.includes("one-time token")) {
+    return new Error("This verification link has expired. Request a new verification email.");
+  }
+  if (lower.includes("rate limit") || lower.includes("only request this after")) {
+    return new Error("Please wait a moment before requesting another email.");
   }
   if (lower.includes("password")) {
     return new Error("Your email or password could not be accepted. Please check the requirements and try again.");
@@ -86,7 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           password,
           options: {
             data: metadata,
-            emailRedirectTo: `${window.location.origin}/onboarding`
+            emailRedirectTo: `${window.location.origin}/auth/callback`
           }
         });
         if (error) throw error;
@@ -110,6 +117,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error) throw error;
       } catch (error) {
         throw toSafeAuthError(error, "Password reset could not be started. Please try again.");
+      }
+    },
+    async resendVerification(email) {
+      try {
+        const { error } = await requireSupabase().auth.resend({
+          type: "signup",
+          email,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`
+          }
+        });
+        if (error) throw error;
+      } catch (error) {
+        throw toSafeAuthError(error, "Verification email could not be resent. Please try again.");
       }
     },
     async updatePassword(password) {
