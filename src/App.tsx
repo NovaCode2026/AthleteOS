@@ -832,13 +832,27 @@ function AppShell() {
   </div>;
 }
 
-function RecordModal({ form, setForm, save, profile, userId }) {
-  form: { resource: Resource };
-  setForm: (form: null) => void;
-  save: (resource: Resource, values: Record<string, string | number | boolean>) => Promise<void>;
+type RecordModalProps = {
+  form: {
+    resource: Resource;
+    values: Record<string, string | number | boolean>;
+  };
+  setForm: React.Dispatch<
+    React.SetStateAction<{
+      resource: Resource;
+      values: Record<string, string | number | boolean>;
+    } | null>
+  >;
+  save: (
+    resource: Resource,
+    values: Record<string, string | number | boolean>,
+    options?: { rethrow?: boolean }
+  ) => Promise<void>;
   profile: Profile;
   userId?: string;
-}) {
+};
+
+function RecordModal({ form, setForm, save, profile, userId }: RecordModalProps) {
   const [values, setValues] = useState<Record<string, string | number | boolean>>(form.resource === "profile" ? profile as Record<string, string | number | boolean> : {});
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
