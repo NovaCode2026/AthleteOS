@@ -832,7 +832,7 @@ function AppShell() {
   </div>;
 }
 
-function RecordModal({ form, setForm, save, profile }: {
+function RecordModal({ form, setForm, save, profile, userId }) {
   form: { resource: Resource };
   setForm: (form: null) => void;
   save: (resource: Resource, values: Record<string, string | number | boolean>) => Promise<void>;
