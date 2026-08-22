@@ -173,3 +173,7 @@ drop policy if exists "audit logs admin read" on public.audit_logs;
 drop policy if exists "audit logs admin insert" on public.audit_logs;
 create policy "audit logs admin read" on public.audit_logs for select using (public.is_platform_admin());
 create policy "audit logs admin insert" on public.audit_logs for insert with check (public.is_platform_admin());
+
+grant usage on schema public to anon, authenticated;
+
+grant select, insert, update, delete on public.profiles to authenticated;
