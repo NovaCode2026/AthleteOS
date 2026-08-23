@@ -37,21 +37,14 @@ function createUserSupabaseClient(accessToken) {
 
   return createClient(supabaseUrl, supabaseAnonKey, {
     global: {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
+      headers: { Authorization: `Bearer ${accessToken}` }
     },
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false
-    }
+    auth: { persistSession: false, autoRefreshToken: false }
   });
 }
 
 export default async function handler(request) {
-  if (request.method !== "POST") {
-    return json("Method not allowed.", 405);
-  }
+  if (request.method !== "POST") return json("Method not allowed.", 405);
 
   const body = await request.json().catch(() => ({}));
   const topic = typeof body.topic === "string" ? body.topic.trim() : "";
@@ -60,19 +53,15 @@ export default async function handler(request) {
   if (!allowedTopics.has(topic) || !prompt) {
     return json("Choose a topic and enter a prompt.", 400);
   }
-
   if (topic.length > MAX_TOPIC_LENGTH) {
     return json(`Topic is too long. Maximum length is ${MAX_TOPIC_LENGTH} characters.`, 400);
   }
-
   if (prompt.length > MAX_PROMPT_LENGTH) {
     return json(`Prompt is too long. Maximum length is ${MAX_PROMPT_LENGTH} characters.`, 413);
   }
 
   const accessToken = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!accessToken) {
-    return json("Please sign in again before using AI Coach.", 401);
-  }
+  if (!accessToken) return json("Please sign in again before using AI Coach.", 401);
 
   let supabase;
   try {
@@ -82,23 +71,13 @@ export default async function handler(request) {
   }
 
   const { data: userData, error: userError } = await supabase.auth.getUser(accessToken);
-  if (userError || !userData?.user) {
-    return json("Please sign in again before using AI Coach.", 401);
-  }
+  if (userError || !userData?.user) return json("Please sign in again before using AI Coach.", 401);
 
   const userId = userData.user.id;
   const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("user_id, plan_id")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (profileError) {
-    return json("Unable to verify your AI entitlement.", 503);
-  }
-  if (!profile) {
-    return json("Complete onboarding before using AI Coach.", 403);
-  }
+    .from("profiles").select("user_id, plan_id").eq("user_id", userId).maybeSingle();
+  if (profileError) return json("Unable to verify your AI entitlement.", 503);
+  if (!profile) return json("Complete onboarding before using AI Coach.", 403);
 
   const { data: subscription, error: subscriptionError } = await supabase
     .from("subscriptions")
@@ -106,38 +85,29 @@ export default async function handler(request) {
     .eq("user_id", userId)
     .in("status", ["active", "trialing"])
     .maybeSingle();
-
-  if (subscriptionError) {
-    return json("Unable to verify your subscription.", 503);
-  }
+  if (subscriptionError) return json("Unable to verify your subscription.", 503);
 
   const planId = subscription?.plan_id || profile.plan_id || "free";
   const monthlyLimit = planLimits[planId] ?? 0;
+  if (monthlyLimit <= 0) return json("AI Coach is not available on the Free plan.", 403);
 
-  if (monthlyLimit <= 0) {
-    return json("AI Coach is not available on the Free plan.", 403);
-  }
-
-  // Reserve the monthly usage slot atomically in Postgres. The RPC takes a
-  // per-user/month advisory lock, checks the quota, and records the reservation
-  // in the same transaction. This prevents concurrent requests from both
-  // passing a check-then-insert quota test.
-  const { data: reserved, error: reservationError } = await supabase.rpc("reserve_ai_usage", {
+  // Atomic quota reservation: Postgres locks this user/month, checks the
+  // current count, and inserts the reservation in one transaction.
+  const { data: reservationId, error: reservationError } = await supabase.rpc("reserve_ai_usage", {
     p_user_id: userId,
     p_plan_id: planId,
     p_topic: topic,
     p_monthly_limit: monthlyLimit
   });
+  if (reservationError) return json("Unable to reserve your monthly AI usage. Please try again.", 503);
+  if (!reservationId) return json("Monthly AI limit reached for your current plan.", 429);
 
-  if (reservationError) {
-    return json("Unable to reserve your monthly AI usage. Please try again.", 503);
-  }
-
-  if (!reserved) {
-    return json("Monthly AI limit reached for your current plan.", 429);
-  }
+  const releaseReservation = async () => {
+    await supabase.from("ai_usage_events").delete().eq("id", reservationId).eq("user_id", userId);
+  };
 
   if (!process.env.OPENAI_API_KEY) {
+    await releaseReservation();
     return json("AI Coach is temporarily unavailable.", 503);
   }
 
@@ -150,20 +120,15 @@ export default async function handler(request) {
     body: JSON.stringify({
       model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
       input: [
-        {
-          role: "system",
-          content: "You are AthleteOS, a careful Taekwondo performance assistant. Give practical, age-safe, non-medical guidance. Encourage professional medical help for injuries."
-        },
-        {
-          role: "user",
-          content: `Topic: ${topic}\nAthlete request: ${prompt}`
-        }
+        { role: "system", content: "You are AthleteOS, a careful Taekwondo performance assistant. Give practical, age-safe, non-medical guidance. Encourage professional medical help for injuries." },
+        { role: "user", content: `Topic: ${topic}\nAthlete request: ${prompt}` }
       ]
     })
   });
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
+    await releaseReservation();
     return json("AI Coach request failed. Please try again later.", 502);
   }
 
@@ -171,24 +136,15 @@ export default async function handler(request) {
     || payload.output?.flatMap(item => item.content || []).map(item => item.text || "").join("")
     || "No response generated.";
 
-  // Update the reservation with the actual token usage. The quota slot was
-  // already reserved atomically, so this is metering rather than authorization.
-  const { data: reservedRows, error: reservationLookupError } = await supabase
+  // Meter the exact reservation that was authorized for this request.
+  const { error: meterError } = await supabase
     .from("ai_usage_events")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("plan_id", planId)
-    .eq("topic", topic)
-    .eq("tokens_used", 0)
-    .order("created_at", { ascending: false })
-    .limit(1);
+    .update({ tokens_used: payload.usage?.total_tokens ?? 0 })
+    .eq("id", reservationId)
+    .eq("user_id", userId);
 
-  if (!reservationLookupError && reservedRows?.[0]) {
-    await supabase
-      .from("ai_usage_events")
-      .update({ tokens_used: payload.usage?.total_tokens ?? 0 })
-      .eq("id", reservedRows[0].id)
-      .eq("user_id", userId);
+  if (meterError) {
+    return json("AI usage could not be recorded. Please try again.", 503);
   }
 
   return Response.json({ answer });
