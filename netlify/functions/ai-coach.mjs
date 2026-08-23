@@ -19,6 +19,10 @@ const planLimits = {
   academy: 2000
 };
 
+// Keep untrusted user input bounded before it reaches the model/API.
+const MAX_PROMPT_LENGTH = 4000;
+const MAX_TOPIC_LENGTH = 64;
+
 function json(error, status) {
   return Response.json({ error }, { status });
 }
@@ -44,19 +48,25 @@ function createUserSupabaseClient(accessToken) {
   });
 }
 
-function getMonthStartIso() {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
-}
-
 export default async function handler(request) {
   if (request.method !== "POST") {
     return json("Method not allowed.", 405);
   }
 
-  const { topic, prompt } = await request.json().catch(() => ({}));
-  if (!allowedTopics.has(topic) || !prompt?.trim()) {
+  const body = await request.json().catch(() => ({}));
+  const topic = typeof body.topic === "string" ? body.topic.trim() : "";
+  const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
+
+  if (!allowedTopics.has(topic) || !prompt) {
     return json("Choose a topic and enter a prompt.", 400);
+  }
+
+  if (topic.length > MAX_TOPIC_LENGTH) {
+    return json(`Topic is too long. Maximum length is ${MAX_TOPIC_LENGTH} characters.`, 400);
+  }
+
+  if (prompt.length > MAX_PROMPT_LENGTH) {
+    return json(`Prompt is too long. Maximum length is ${MAX_PROMPT_LENGTH} characters.`, 413);
   }
 
   const accessToken = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
@@ -108,17 +118,22 @@ export default async function handler(request) {
     return json("AI Coach is not available on the Free plan.", 403);
   }
 
-  const { count, error: usageError } = await supabase
-    .from("ai_usage_events")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .gte("created_at", getMonthStartIso());
+  // Reserve the monthly usage slot atomically in Postgres. The RPC takes a
+  // per-user/month advisory lock, checks the quota, and records the reservation
+  // in the same transaction. This prevents concurrent requests from both
+  // passing a check-then-insert quota test.
+  const { data: reserved, error: reservationError } = await supabase.rpc("reserve_ai_usage", {
+    p_user_id: userId,
+    p_plan_id: planId,
+    p_topic: topic,
+    p_monthly_limit: monthlyLimit
+  });
 
-  if (usageError) {
-    return json("Unable to verify your monthly AI usage.", 503);
+  if (reservationError) {
+    return json("Unable to reserve your monthly AI usage. Please try again.", 503);
   }
 
-  if ((count ?? 0) >= monthlyLimit) {
+  if (!reserved) {
     return json("Monthly AI limit reached for your current plan.", 429);
   }
 
@@ -156,15 +171,24 @@ export default async function handler(request) {
     || payload.output?.flatMap(item => item.content || []).map(item => item.text || "").join("")
     || "No response generated.";
 
-  const { error: meterError } = await supabase.from("ai_usage_events").insert({
-    user_id: userId,
-    plan_id: planId,
-    topic,
-    tokens_used: payload.usage?.total_tokens ?? 0
-  });
+  // Update the reservation with the actual token usage. The quota slot was
+  // already reserved atomically, so this is metering rather than authorization.
+  const { data: reservedRows, error: reservationLookupError } = await supabase
+    .from("ai_usage_events")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("plan_id", planId)
+    .eq("topic", topic)
+    .eq("tokens_used", 0)
+    .order("created_at", { ascending: false })
+    .limit(1);
 
-  if (meterError) {
-    return json("AI usage could not be recorded. Please try again.", 503);
+  if (!reservationLookupError && reservedRows?.[0]) {
+    await supabase
+      .from("ai_usage_events")
+      .update({ tokens_used: payload.usage?.total_tokens ?? 0 })
+      .eq("id", reservedRows[0].id)
+      .eq("user_id", userId);
   }
 
   return Response.json({ answer });
