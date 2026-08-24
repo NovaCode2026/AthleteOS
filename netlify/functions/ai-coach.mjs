@@ -21,6 +21,7 @@ const planLimits = {
 
 const MAX_PROMPT_LENGTH = 4000;
 const MAX_TOPIC_LENGTH = 64;
+const OPENAI_TIMEOUT_MS = 20000;
 
 function json(error, status) {
   return Response.json({ error }, { status });
@@ -38,6 +39,33 @@ function createUserSupabaseClient(accessToken) {
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
     auth: { persistSession: false, autoRefreshToken: false }
   });
+}
+
+async function cancelReservation(supabase, reservationId, userId) {
+  if (!reservationId) return;
+  await supabase.rpc("cancel_ai_usage", {
+    p_usage_id: reservationId,
+    p_user_id: userId
+  }).catch(() => undefined);
+}
+
+function extractResponseText(payload) {
+  if (typeof payload?.output_text === "string" && payload.output_text.trim()) {
+    return payload.output_text.trim();
+  }
+
+  const output = Array.isArray(payload?.output) ? payload.output : [];
+  const parts = [];
+  for (const item of output) {
+    const content = Array.isArray(item?.content) ? item.content : [];
+    for (const block of content) {
+      if (typeof block?.text === "string") parts.push(block.text);
+      else if (typeof block?.text?.value === "string") parts.push(block.text.value);
+    }
+  }
+
+  const answer = parts.join("").trim();
+  return answer || null;
 }
 
 export default async function handler(request) {
@@ -91,7 +119,6 @@ export default async function handler(request) {
   const monthlyLimit = planLimits[planId] ?? 0;
   if (monthlyLimit <= 0) return json("AI Coach is not available on the Free plan.", 403);
 
-  // The quota RPC is SECURITY INVOKER and is restricted by RLS to this user.
   const { data: reservationId, error: reservationError } = await supabase.rpc("reserve_ai_usage", {
     p_user_id: userId,
     p_plan_id: planId,
@@ -102,44 +129,63 @@ export default async function handler(request) {
   if (!reservationId) return json("Monthly AI limit reached for your current plan.", 429);
 
   if (!process.env.OPENAI_API_KEY) {
+    await cancelReservation(supabase, reservationId, userId);
     return json("AI Coach is temporarily unavailable.", 503);
   }
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
-      input: [
-        { role: "system", content: "You are AthleteOS, a careful Taekwondo performance assistant. Give practical, age-safe, non-medical guidance. Encourage professional medical help for injuries." },
-        { role: "user", content: `Topic: ${topic}\nAthlete request: ${prompt}` }
-      ]
-    })
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), OPENAI_TIMEOUT_MS);
+
+  let response;
+  try {
+    response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
+        input: [
+          { role: "system", content: "You are AthleteOS, a careful Taekwondo performance assistant. Give practical, age-safe, non-medical guidance. Encourage professional medical help for injuries." },
+          { role: "user", content: `Topic: ${topic}\nAthlete request: ${prompt}` }
+        ]
+      })
+    });
+  } catch (error) {
+    await cancelReservation(supabase, reservationId, userId);
+    if (error?.name === "AbortError") {
+      return json("AI Coach timed out. Please try again.", 504);
+    }
+    return json("AI Coach request failed. Please try again later.", 502);
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    // The reservation intentionally remains counted as an AI attempt. This
-    // prevents failed requests from becoming a quota bypass path.
+    await cancelReservation(supabase, reservationId, userId);
     return json("AI Coach request failed. Please try again later.", 502);
   }
 
-  const answer = payload.output_text
-    || payload.output?.flatMap(item => item.content || []).map(item => item.text || "").join("")
-    || "No response generated.";
+  const answer = extractResponseText(payload);
+  if (!answer) {
+    await cancelReservation(supabase, reservationId, userId);
+    return json("AI Coach returned an unreadable response. Please try again.", 502);
+  }
 
   const { error: meterError } = await supabase
     .from("ai_usage_events")
-    .update({ tokens_used: payload.usage?.total_tokens ?? 0 })
+    .update({ tokens_used: Number(payload?.usage?.total_tokens) || 0 })
     .eq("id", reservationId)
     .eq("user_id", userId);
 
-  if (meterError) {
-    return json("AI usage could not be recorded. Please try again.", 503);
-  }
-
-  return Response.json({ answer });
+  // A generated answer is still useful even if metering has a transient database
+  // failure. The reservation already consumed the quota atomically, so returning
+  // the answer is safer than discarding successful upstream work.
+  return Response.json({
+    answer,
+    usageRecorded: !meterError
+  });
 }
