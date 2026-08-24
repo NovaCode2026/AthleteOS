@@ -1,0 +1,58 @@
+name: Wire AthleteOS app features
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "scripts/wire-app-features.mjs"
+      - "package.json"
+      - "pnpm-lock.yaml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wire-app-features
+  cancel-in-progress: true
+
+jobs:
+  wire-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Wire app features
+        run: node scripts/wire-app-features.mjs
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Commit generated integration
+        if: success()
+        run: |
+          if git diff --quiet -- src/App.tsx src/styles/main.css; then
+            echo "No app integration changes needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.tsx src/styles/main.css
+          git commit -m "feat: wire live dashboard and admin controls"
+          git push
