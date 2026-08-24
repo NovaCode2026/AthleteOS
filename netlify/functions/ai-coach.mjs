@@ -19,7 +19,6 @@ const planLimits = {
   academy: 2000
 };
 
-// Keep untrusted user input bounded before it reaches the model/API.
 const MAX_PROMPT_LENGTH = 4000;
 const MAX_TOPIC_LENGTH = 64;
 
@@ -36,9 +35,20 @@ function createUserSupabaseClient(accessToken) {
   }
 
   return createClient(supabaseUrl, supabaseAnonKey, {
-    global: {
-      headers: { Authorization: `Bearer ${accessToken}` }
-    },
+    global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+
+function createBackendSupabaseClient() {
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseSecretKey) {
+    throw new Error("SUPABASE_BACKEND_CONFIG_MISSING");
+  }
+
+  return createClient(supabaseUrl, supabaseSecretKey, {
     auth: { persistSession: false, autoRefreshToken: false }
   });
 }
@@ -64,9 +74,14 @@ export default async function handler(request) {
   if (!accessToken) return json("Please sign in again before using AI Coach.", 401);
 
   let supabase;
+  let backendSupabase;
   try {
     supabase = createUserSupabaseClient(accessToken);
-  } catch {
+    backendSupabase = createBackendSupabaseClient();
+  } catch (error) {
+    if (error?.message === "SUPABASE_BACKEND_CONFIG_MISSING") {
+      return json("AI Coach backend services are not configured.", 503);
+    }
     return json("AthleteOS services are not configured for AI access.", 503);
   }
 
@@ -75,7 +90,10 @@ export default async function handler(request) {
 
   const userId = userData.user.id;
   const { data: profile, error: profileError } = await supabase
-    .from("profiles").select("user_id, plan_id").eq("user_id", userId).maybeSingle();
+    .from("profiles")
+    .select("user_id, plan_id")
+    .eq("user_id", userId)
+    .maybeSingle();
   if (profileError) return json("Unable to verify your AI entitlement.", 503);
   if (!profile) return json("Complete onboarding before using AI Coach.", 403);
 
@@ -91,9 +109,9 @@ export default async function handler(request) {
   const monthlyLimit = planLimits[planId] ?? 0;
   if (monthlyLimit <= 0) return json("AI Coach is not available on the Free plan.", 403);
 
-  // Atomic quota reservation: Postgres locks this user/month, checks the
-  // current count, and inserts the reservation in one transaction.
-  const { data: reservationId, error: reservationError } = await supabase.rpc("reserve_ai_usage", {
+  // Quota mutation runs with the backend secret only. Browser roles cannot call
+  // the SECURITY DEFINER quota functions directly.
+  const { data: reservationId, error: reservationError } = await backendSupabase.rpc("reserve_ai_usage", {
     p_user_id: userId,
     p_plan_id: planId,
     p_topic: topic,
@@ -103,7 +121,7 @@ export default async function handler(request) {
   if (!reservationId) return json("Monthly AI limit reached for your current plan.", 429);
 
   const releaseReservation = async () => {
-    await supabase.from("ai_usage_events").delete().eq("id", reservationId).eq("user_id", userId);
+    await backendSupabase.rpc("cancel_ai_usage", { p_usage_id: reservationId });
   };
 
   if (!process.env.OPENAI_API_KEY) {
@@ -136,12 +154,10 @@ export default async function handler(request) {
     || payload.output?.flatMap(item => item.content || []).map(item => item.text || "").join("")
     || "No response generated.";
 
-  // Meter the exact reservation that was authorized for this request.
-  const { error: meterError } = await supabase
-    .from("ai_usage_events")
-    .update({ tokens_used: payload.usage?.total_tokens ?? 0 })
-    .eq("id", reservationId)
-    .eq("user_id", userId);
+  const { error: meterError } = await backendSupabase.rpc("complete_ai_usage", {
+    p_usage_id: reservationId,
+    p_tokens_used: payload.usage?.total_tokens ?? 0
+  });
 
   if (meterError) {
     return json("AI usage could not be recorded. Please try again.", 503);
