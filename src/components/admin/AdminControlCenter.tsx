@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
 type AdminControlCenterProps = { userId: string; role: string };
-
 type Section = { key: string; label: string; table: string };
 
 const sections: Section[] = [
@@ -12,7 +11,7 @@ const sections: Section[] = [
   { key: "tournaments", label: "Tournaments", table: "tournaments" },
   { key: "medals", label: "Medals", table: "medals" },
   { key: "documents", label: "Documents", table: "documents" },
-  { key: "verification", label: "Verification", table: "verification_requests" },
+  { key: "verification", label: "Verification", table: "student_verifications" },
   { key: "subscriptions", label: "Subscriptions", table: "subscriptions" },
   { key: "ai", label: "AI Usage", table: "ai_usage_events" },
   { key: "flags", label: "Feature Flags", table: "feature_flags" },
