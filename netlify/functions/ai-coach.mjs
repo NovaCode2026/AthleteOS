@@ -40,19 +40,6 @@ function createUserSupabaseClient(accessToken) {
   });
 }
 
-function createBackendSupabaseClient() {
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !supabaseSecretKey) {
-    throw new Error("SUPABASE_BACKEND_CONFIG_MISSING");
-  }
-
-  return createClient(supabaseUrl, supabaseSecretKey, {
-    auth: { persistSession: false, autoRefreshToken: false }
-  });
-}
-
 export default async function handler(request) {
   if (request.method !== "POST") return json("Method not allowed.", 405);
 
@@ -74,14 +61,9 @@ export default async function handler(request) {
   if (!accessToken) return json("Please sign in again before using AI Coach.", 401);
 
   let supabase;
-  let backendSupabase;
   try {
     supabase = createUserSupabaseClient(accessToken);
-    backendSupabase = createBackendSupabaseClient();
-  } catch (error) {
-    if (error?.message === "SUPABASE_BACKEND_CONFIG_MISSING") {
-      return json("AI Coach backend services are not configured.", 503);
-    }
+  } catch {
     return json("AthleteOS services are not configured for AI access.", 503);
   }
 
@@ -109,9 +91,8 @@ export default async function handler(request) {
   const monthlyLimit = planLimits[planId] ?? 0;
   if (monthlyLimit <= 0) return json("AI Coach is not available on the Free plan.", 403);
 
-  // Quota mutation runs with the backend secret only. Browser roles cannot call
-  // the SECURITY DEFINER quota functions directly.
-  const { data: reservationId, error: reservationError } = await backendSupabase.rpc("reserve_ai_usage", {
+  // The quota RPC is SECURITY INVOKER and is restricted by RLS to this user.
+  const { data: reservationId, error: reservationError } = await supabase.rpc("reserve_ai_usage", {
     p_user_id: userId,
     p_plan_id: planId,
     p_topic: topic,
@@ -120,12 +101,7 @@ export default async function handler(request) {
   if (reservationError) return json("Unable to reserve your monthly AI usage. Please try again.", 503);
   if (!reservationId) return json("Monthly AI limit reached for your current plan.", 429);
 
-  const releaseReservation = async () => {
-    await backendSupabase.rpc("cancel_ai_usage", { p_usage_id: reservationId });
-  };
-
   if (!process.env.OPENAI_API_KEY) {
-    await releaseReservation();
     return json("AI Coach is temporarily unavailable.", 503);
   }
 
@@ -146,7 +122,8 @@ export default async function handler(request) {
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    await releaseReservation();
+    // The reservation intentionally remains counted as an AI attempt. This
+    // prevents failed requests from becoming a quota bypass path.
     return json("AI Coach request failed. Please try again later.", 502);
   }
 
@@ -154,10 +131,11 @@ export default async function handler(request) {
     || payload.output?.flatMap(item => item.content || []).map(item => item.text || "").join("")
     || "No response generated.";
 
-  const { error: meterError } = await backendSupabase.rpc("complete_ai_usage", {
-    p_usage_id: reservationId,
-    p_tokens_used: payload.usage?.total_tokens ?? 0
-  });
+  const { error: meterError } = await supabase
+    .from("ai_usage_events")
+    .update({ tokens_used: payload.usage?.total_tokens ?? 0 })
+    .eq("id", reservationId)
+    .eq("user_id", userId);
 
   if (meterError) {
     return json("AI usage could not be recorded. Please try again.", 503);
