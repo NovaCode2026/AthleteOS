@@ -5,11 +5,9 @@ import { calculateReadiness } from "../../lib/readiness";
 import { supabase } from "../../lib/supabase";
 
 type Props = { data: CloudData; onRefresh?: () => Promise<void> };
-
 type Factor = { label: string; score: number; weight: number };
 
 function clamp(value: number) { return Math.max(0, Math.min(100, Math.round(value))); }
-
 function getFactors(data: CloudData): Factor[] {
   const p = data.profile || {};
   const profileFields = [p.full_name, p.date_of_birth, p.weight_kg, p.height_cm, p.belt, p.academy, p.coach];
@@ -38,14 +36,12 @@ export default function AthleteCommandCenter({ data, onRefresh }: Props) {
   const readiness = calculateReadiness(data);
   const factors = useMemo(() => getFactors(data), [data]);
   const unread = data.notifications.filter((n) => !n.read_at);
-  const nextTournament = [...data.tournaments]
-    .filter((t) => t.starts_at && new Date(t.starts_at).getTime() >= Date.now())
-    .sort((a, b) => new Date(a.starts_at!).getTime() - new Date(b.starts_at!).getTime())[0];
+  const nextTournament = [...data.tournaments].filter((t) => t.starts_at && new Date(t.starts_at).getTime() >= Date.now()).sort((a, b) => new Date(a.starts_at!).getTime() - new Date(b.starts_at!).getTime())[0];
   const pending = data.checklist.filter((x) => !x.completed).slice(0, 3);
 
   useEffect(() => {
     if (!supabase || !data.profile.user_id) return;
-    const tables = ["profiles", "training", "tournaments", "goals", "checklist", "documents", "student_verifications", "notifications", "weights", "medals"];
+    const tables = ["profiles", "training_sessions", "tournaments", "goals", "competition_checklists", "documents", "student_verifications", "notifications", "weight_logs", "medals", "tournament_scans", "subscriptions", "subscription_usage"];
     const channel = supabase.channel(`athlete-command-center-${data.profile.user_id}`);
     tables.forEach((table) => channel.on("postgres_changes", { event: "*", schema: "public", table, filter: `user_id=eq.${data.profile.user_id}` }, async () => {
       setUpdatedAt(new Date());
