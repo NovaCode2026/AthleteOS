@@ -14,7 +14,6 @@ function addImport(source, importLine, anchor) {
 app = addImport(app, 'import AthleteCommandCenter from "./components/dashboard/AthleteCommandCenter";', 'import "./styles/main.css";');
 app = addImport(app, 'import AdminControlCenter from "./components/admin/AdminControlCenter";', 'import "./styles/main.css";');
 
-// Insert the live command center into the existing Dashboard without deleting existing dashboard features.
 if (!app.includes("<AthleteCommandCenter")) {
   const dashboardStart = app.indexOf("function Dashboard(");
   if (dashboardStart < 0) throw new Error("Dashboard component not found; refusing unsafe rewrite");
@@ -24,7 +23,6 @@ if (!app.includes("<AthleteCommandCenter")) {
   app = app.slice(0, returnStart) + insertion + app.slice(returnStart + "return <>".length);
 }
 
-// Replace only the AdminPage function body, preserving everything around it.
 if (!app.includes("<AdminControlCenter")) {
   const start = app.indexOf("function AdminPage(");
   const end = app.indexOf("function OnboardingPage(", start);
@@ -41,4 +39,3 @@ if (!css.includes(cssMarker)) {
 fs.writeFileSync(appPath, app);
 fs.writeFileSync(cssPath, css);
 console.log("AthleteOS app features wired successfully.");
-`;
