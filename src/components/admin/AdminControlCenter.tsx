@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
 type AdminControlCenterProps = { userId: string; role: string };
-type Section = { key: string; label: string; table: string };
+type Section = { key: string; label: string; table: string; destructive?: boolean };
 
 const sections: Section[] = [
   { key: "profiles", label: "Users / Profiles", table: "profiles" },
@@ -27,9 +27,16 @@ export default function AdminControlCenter({ userId, role }: AdminControlCenterP
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const section = sections.find((item) => item.key === selected) ?? sections[0];
-  const canManage = ["admin", "super_admin"].includes(role);
+  const isSuperAdmin = role === "super_admin";
+  const canManage = role === "admin" || isSuperAdmin;
+  const canDelete = canManage && ["support", "notifications"].indexOf(section.key) < 0;
 
   const load = async () => {
+    if (!supabase) {
+      setError("Supabase is not configured.");
+      setRows([]);
+      return;
+    }
     setLoading(true);
     setError("");
     const { data, error: queryError } = await supabase.from(section.table).select("*").limit(100);
@@ -40,9 +47,10 @@ export default function AdminControlCenter({ userId, role }: AdminControlCenterP
 
   useEffect(() => {
     void load();
+    if (!supabase) return;
     const channel = supabase
       .channel(`admin-${section.table}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: section.table }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: section.table }, () => { void load(); })
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
   }, [section.table]);
@@ -54,7 +62,7 @@ export default function AdminControlCenter({ userId, role }: AdminControlCenterP
   }, [rows]);
 
   const remove = async (id: unknown) => {
-    if (!canManage || !id || !window.confirm("Delete this record? This action cannot be undone.")) return;
+    if (!canDelete || !id || !supabase || !window.confirm("Delete this record? This action cannot be undone.")) return;
     const { error: deleteError } = await supabase.from(section.table).delete().eq("id", String(id));
     if (deleteError) setError(deleteError.message); else await load();
   };
@@ -65,7 +73,7 @@ export default function AdminControlCenter({ userId, role }: AdminControlCenterP
         <div>
           <span className="eyebrow">Admin control center</span>
           <h2>System controls</h2>
-          <p>Authenticated operations only. Realtime data refresh is enabled for the selected resource.</p>
+          <p>Role: <strong>{role}</strong> · Realtime refresh is enabled for the selected resource.</p>
         </div>
         <button className="btn" onClick={() => void load()} disabled={loading}>{loading ? "Refreshing..." : "Refresh"}</button>
       </div>
@@ -78,13 +86,11 @@ export default function AdminControlCenter({ userId, role }: AdminControlCenterP
         </nav>
 
         <div className="admin-resource">
-          <div className="admin-resource-head">
-            <h3>{section.label}</h3>
-            <span>{rows.length} loaded</span>
-          </div>
+          <div className="admin-resource-head"><h3>{section.label}</h3><span>{rows.length} loaded</span></div>
           {error && <p className="notice" role="alert">{error}</p>}
+          {!canManage && <p className="notice" role="status">Read-only admin view. Elevated write controls require an admin or super_admin role.</p>}
           {!loading && !rows.length && <div className="empty"><strong>No records found</strong><p>There are no records visible to this admin role.</p></div>}
-          {!!rows.length && <div className="table-wrap"><table><thead><tr>{columns.map((key) => <th key={key}>{key}</th>)}{canManage && <th>Actions</th>}</tr></thead><tbody>{rows.map((row, index) => <tr key={String(row.id ?? index)}>{columns.map((key) => <td key={key}>{typeof row[key] === "object" ? JSON.stringify(row[key]) : String(row[key] ?? "—")}</td>)}{canManage && <td><button className="btn danger" onClick={() => void remove(row.id)} disabled={!row.id}>Delete</button></td>}</tr>)}</tbody></table></div>}
+          {!!rows.length && <div className="table-wrap"><table><thead><tr>{columns.map((key) => <th key={key}>{key}</th>)}{canDelete && <th>Actions</th>}</tr></thead><tbody>{rows.map((row, index) => <tr key={String(row.id ?? index)}>{columns.map((key) => <td key={key}>{typeof row[key] === "object" ? JSON.stringify(row[key]) : String(row[key] ?? "—")}</td>)}{canDelete && <td><button className="btn danger" onClick={() => void remove(row.id)} disabled={!row.id}>Delete</button></td>}</tr>)}</tbody></table></div>}
           <small className="admin-note">Signed-in administrator: {userId}</small>
         </div>
       </div>
