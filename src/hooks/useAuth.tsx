@@ -20,6 +20,7 @@ interface AuthContextValue {
   emailVerified: boolean;
   signUp: (credentials: SignUpCredentials) => Promise<void>;
   signIn: (credentials: Credentials) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   resendVerification: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
@@ -107,6 +108,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error) throw error;
       } catch (error) {
         throw toSafeAuthError(error, "Login could not be completed. Please try again.");
+      }
+    },
+    async signInWithGoogle() {
+      try {
+        const { error } = await requireSupabase().auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo: `${window.location.origin}/auth/callback`
+          }
+        });
+        if (error) throw error;
+      } catch (error) {
+        throw toSafeAuthError(error, "Google sign-in could not be started. Please try again.");
       }
     },
     async resetPassword(email) {
