@@ -19,8 +19,8 @@
     "dev": "vite",
     "build": "node scripts/build.mjs",
     "preview": "vite preview",
-    "check": "node scripts/build.mjs",
-    "test": "node scripts/logic-tests.mjs && node scripts/build.mjs"
+    "check": "pnpm run build && pnpm test",
+    "test": "node --test && node scripts/logic-tests.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
@@ -35,6 +35,6 @@
     "vite": "^5.4.2"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "22.x"
   }
 }

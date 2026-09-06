@@ -19,6 +19,10 @@ const planLimits = {
   academy: 2000
 };
 
+const MAX_PROMPT_LENGTH = 4000;
+const MAX_TOPIC_LENGTH = 64;
+const OPENAI_TIMEOUT_MS = 20000;
+
 function json(error, status) {
   return Response.json({ error }, { status });
 }
@@ -36,26 +40,23 @@ function createUserSupabaseClient(accessToken) {
   }
 
   return createClient(supabaseUrl, supabaseAnonKey, {
-    global: {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    },
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false
-    }
+    global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    auth: { persistSession: false, autoRefreshToken: false }
   });
 }
 
-function getMonthStartIso() {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+async function cancelReservation(supabase, reservationId, userId) {
+  if (!reservationId) return;
+  await supabase.rpc("cancel_ai_usage", {
+    p_usage_id: reservationId,
+    p_user_id: userId
+  }).catch(() => undefined);
 }
 
-function extractAnswer(payload) {
+function extractResponseText(payload) {
   if (!payload || typeof payload !== "object") return "";
   if (typeof payload.output_text === "string" && payload.output_text.trim()) return payload.output_text.trim();
+
   const output = Array.isArray(payload.output) ? payload.output : [];
   const chunks = [];
   for (const item of output) {
@@ -70,23 +71,28 @@ function extractAnswer(payload) {
   const message = Array.isArray(payload.choices) ? payload.choices[0]?.message?.content : null;
   if (typeof message === "string") return message.trim();
   if (Array.isArray(message)) return message.map((part) => part?.text || part?.content || "").join("").trim();
-  return "";
+  return null;
 }
 
 export default async function handler(request) {
-  if (request.method !== "POST") {
-    return json("Method not allowed.", 405);
-  }
+  if (request.method !== "POST") return json("Method not allowed.", 405);
 
-  const { topic, prompt } = await request.json().catch(() => ({}));
-  if (!allowedTopics.has(topic) || !prompt?.trim()) {
+  const body = await request.json().catch(() => ({}));
+  const topic = typeof body.topic === "string" ? body.topic.trim() : "";
+  const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
+
+  if (!allowedTopics.has(topic) || !prompt) {
     return json("Choose a topic and enter a prompt.", 400);
+  }
+  if (topic.length > MAX_TOPIC_LENGTH) {
+    return json(`Topic is too long. Maximum length is ${MAX_TOPIC_LENGTH} characters.`, 400);
+  }
+  if (prompt.length > MAX_PROMPT_LENGTH) {
+    return json(`Prompt is too long. Maximum length is ${MAX_PROMPT_LENGTH} characters.`, 413);
   }
 
   const accessToken = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!accessToken) {
-    return json("Please sign in again before using AI Coach.", 401);
-  }
+  if (!accessToken) return json("Please sign in again before using AI Coach.", 401);
 
   let supabase;
   try {
@@ -96,9 +102,7 @@ export default async function handler(request) {
   }
 
   const { data: userData, error: userError } = await supabase.auth.getUser(accessToken);
-  if (userError || !userData?.user) {
-    return json("Please sign in again before using AI Coach.", 401);
-  }
+  if (userError || !userData?.user) return json("Please sign in again before using AI Coach.", 401);
 
   const userId = userData.user.id;
   const { data: profile, error: profileError } = await supabase
@@ -106,13 +110,8 @@ export default async function handler(request) {
     .select("user_id, plan_id")
     .eq("user_id", userId)
     .maybeSingle();
-
-  if (profileError) {
-    return json("Unable to verify your AI entitlement.", 503);
-  }
-  if (!profile) {
-    return json("Complete onboarding before using AI Coach.", 403);
-  }
+  if (profileError) return json("Unable to verify your AI entitlement.", 503);
+  if (!profile) return json("Complete onboarding before using AI Coach.", 403);
 
   const { data: subscription, error: subscriptionError } = await supabase
     .from("subscriptions")
@@ -120,39 +119,30 @@ export default async function handler(request) {
     .eq("user_id", userId)
     .in("status", ["active", "trialing"])
     .maybeSingle();
-
-  if (subscriptionError) {
-    return json("Unable to verify your subscription.", 503);
-  }
+  if (subscriptionError) return json("Unable to verify your subscription.", 503);
 
   const planId = subscription?.plan_id || profile.plan_id || "free";
   const monthlyLimit = planLimits[planId] ?? 0;
+  if (monthlyLimit <= 0) return json("AI Coach is not available on the Free plan.", 403);
 
-  if (monthlyLimit <= 0) {
-    return json("AI Coach is not available on the Free plan.", 403);
-  }
-
-  const { count, error: usageError } = await supabase
-    .from("ai_usage_events")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .gte("created_at", getMonthStartIso());
-
-  if (usageError) {
-    return json("Unable to verify your monthly AI usage.", 503);
-  }
-
-  if ((count ?? 0) >= monthlyLimit) {
-    return json("Monthly AI limit reached for your current plan.", 429);
-  }
+  const { data: reservationId, error: reservationError } = await supabase.rpc("reserve_ai_usage", {
+    p_user_id: userId,
+    p_plan_id: planId,
+    p_topic: topic,
+    p_monthly_limit: monthlyLimit
+  });
+  if (reservationError) return json("Unable to reserve your monthly AI usage. Please try again.", 503);
+  if (!reservationId) return json("Monthly AI limit reached for your current plan.", 429);
 
   const openAiKey = env("OPENAI_API_KEY");
   if (!openAiKey) {
+    await cancelReservation(supabase, reservationId, userId);
     return json("AI Coach is temporarily unavailable.", 503);
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(new Error("timeout")), 20000);
+  const timeoutId = setTimeout(() => controller.abort(), OPENAI_TIMEOUT_MS);
+
   let response;
   try {
     response = await fetch("https://api.openai.com/v1/responses", {
@@ -161,6 +151,7 @@ export default async function handler(request) {
         Authorization: `Bearer ${openAiKey}`,
         "Content-Type": "application/json"
       },
+      signal: controller.signal,
       body: JSON.stringify({
         model: env("OPENAI_MODEL") || "gpt-4.1-mini",
         input: [
@@ -173,39 +164,41 @@ export default async function handler(request) {
             content: `Topic: ${topic}\nAthlete request: ${prompt}`
           }
         ]
-      }),
-      signal: controller.signal
+      })
     });
   } catch (error) {
-    clearTimeout(timeout);
-    if (controller.signal.aborted) {
-      return json("AI Coach request timed out. Please try again.", 504);
+    await cancelReservation(supabase, reservationId, userId);
+    if (error?.name === "AbortError") {
+      return json("AI Coach timed out. Please try again.", 504);
     }
-    throw error;
+    return json("AI Coach request failed. Please try again later.", 502);
   } finally {
-    clearTimeout(timeout);
+    clearTimeout(timeoutId);
   }
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
+    await cancelReservation(supabase, reservationId, userId);
     return json("AI Coach request failed. Please try again later.", 502);
   }
 
-  const answer = extractAnswer(payload) || "No response generated.";
-
-  const { error: meterError } = await supabase.from("ai_usage_events").insert({
-    user_id: userId,
-    plan_id: planId,
-    topic,
-    tokens_used: payload.usage?.total_tokens ?? 0
-  });
-
-  if (meterError) {
-    return Response.json({
-      answer,
-      warning: "AI response generated, but usage metering will be retried later."
-    });
+  const answer = extractResponseText(payload);
+  if (!answer) {
+    await cancelReservation(supabase, reservationId, userId);
+    return json("AI Coach returned an unreadable response. Please try again.", 502);
   }
 
-  return Response.json({ answer });
+  const { error: meterError } = await supabase
+    .from("ai_usage_events")
+    .update({ tokens_used: Number(payload?.usage?.total_tokens) || 0 })
+    .eq("id", reservationId)
+    .eq("user_id", userId);
+
+  // A generated answer is still useful even if metering has a transient database
+  // failure. The reservation already consumed the quota atomically, so returning
+  // the answer is safer than discarding successful upstream work.
+  return Response.json({
+    answer,
+    usageRecorded: !meterError
+  });
 }
