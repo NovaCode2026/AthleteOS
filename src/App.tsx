@@ -9,11 +9,12 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
-import { isSupabaseConfigured, supabaseConfig } from "./lib/supabase";
+import { isSupabaseConfigured, supabase, supabaseConfig } from "./lib/supabase";
 import {
   createSignedFileUrl, deletePrivateFile, deleteRow, insertRow, listRows, updateRow, uploadPrivateFile, upsertRow, type Resource
 } from "./services/database";
 import { plans, getPlan } from "./config/plans";
+import { calculateReadiness } from "./utils/readiness";
 import type {
   ChecklistItem, CloudData, DocumentRecord, FeedbackItem, Goal, Medal as MedalRecord,
   AiUsageEvent, Profile, RoadmapItem, RoadmapVote, Subscription, SubscriptionUsage, TournamentScan, TrainingSession, Tournament, UsageSummary, VerificationRequest, WeightLog
@@ -179,6 +180,18 @@ function AuthScreen({ initialMode }: { initialMode?: AuthMode }) {
     }
   }
 
+  async function signInWithGoogle() {
+    setMessage("");
+    setBusy(true);
+    try {
+      await auth.signInWithGoogle();
+      setMessage("Redirecting to Google sign-in...");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Google sign-in could not be started.");
+      setBusy(false);
+    }
+  }
+
   if (!auth.configured) {
     const configurationIssues = supabaseConfig.missing.concat(supabaseConfig.invalid);
     return <main className="auth-page"><section className="auth-card">
@@ -193,6 +206,8 @@ function AuthScreen({ initialMode }: { initialMode?: AuthMode }) {
       <span className="eyebrow">Nova Code</span>
       <h1>AthleteOS - Taekwondo Edition</h1>
       <p>Secure cloud command center for training, tournaments, documents, medals, goals, verification, plans, and AI coaching.</p>
+      <button type="button" className="btn oauth-btn" onClick={() => void signInWithGoogle()} disabled={busy}>Continue with Google</button>
+      <div className="oauth-divider"><span>or use email</span></div>
       <form onSubmit={submit}>
         {mode === "register" && <Field label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />}
         {mode !== "reset" && <Field label="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />}
@@ -360,6 +375,7 @@ function safeHost(url: string) {
 
 function Dashboard({ data, usage, openForm }: { data: CloudData; usage: UsageSummary; openForm: (resource: Resource) => void }) {
   const latestWeight = data.weights.at(-1)?.weight_kg || data.profile.weight_kg || 0;
+  const readiness = calculateReadiness(data);
   return <>
     <section className="hero card">
       <div>
@@ -368,7 +384,7 @@ function Dashboard({ data, usage, openForm }: { data: CloudData; usage: UsageSum
         <p>Cloud-backed athlete operating system with protected routes, Supabase RLS, plan limits, student verification, and server-side AI.</p>
         <div className="hero-actions"><button className="btn primary" onClick={() => openForm("training")}>Log training</button><button className="btn" onClick={() => openForm("tournaments")}>Add tournament</button></div>
       </div>
-      <div className="readiness"><strong>{Math.min(99, 70 + data.goals.length * 3)}%</strong><span>Readiness</span></div>
+      <div className="readiness"><strong>{readiness}%</strong><span>Readiness</span></div>
     </section>
     <section className="metrics">
       <Stat icon={Trophy} label="Tournaments" value={data.tournaments.length} note="Tracked events" />
@@ -663,6 +679,7 @@ function OnboardingPage({ profile, saveProfile }: { profile: Profile; saveProfil
 
 function AppShell() {
   const auth = useAuth();
+  const userId = auth.user?.id;
   const [page, setPage] = useState<PageId>(() => pageFromPath());
   const [toast, setToast] = useState<ToastState>(null);
   const { data, loading, refresh, hasProfile } = useCloudData(auth.user?.id, setToast);
@@ -684,6 +701,28 @@ function AppShell() {
     window.addEventListener("popstate", syncPath);
     return () => window.removeEventListener("popstate", syncPath);
   }, []);
+
+  useEffect(() => {
+    if (!userId || !supabase || !isSupabaseConfigured) return undefined;
+    const channel = supabase
+      .channel(`athleteos-${userId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles", filter: `user_id=eq.${userId}` }, () => { void refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "training_sessions", filter: `user_id=eq.${userId}` }, () => { void refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "tournaments", filter: `user_id=eq.${userId}` }, () => { void refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "medals", filter: `user_id=eq.${userId}` }, () => { void refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "weight_logs", filter: `user_id=eq.${userId}` }, () => { void refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "goals", filter: `user_id=eq.${userId}` }, () => { void refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "documents", filter: `user_id=eq.${userId}` }, () => { void refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "feedback_items" }, () => { void refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "roadmap_items" }, () => { void refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "roadmap_votes" }, () => { void refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "tournament_scans", filter: `user_id=eq.${userId}` }, () => { void refresh(); })
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [userId]);
 
   const current = useMemo(() => visibleNav.find(([id]) => id === page), [page, visibleNav]);
   const pageTitle = current?.[1] || (page === "admin" ? "Admin Panel" : "Dashboard");

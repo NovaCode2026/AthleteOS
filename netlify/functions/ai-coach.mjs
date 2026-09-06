@@ -23,9 +23,13 @@ function json(error, status) {
   return Response.json({ error }, { status });
 }
 
+function env(name) {
+  return globalThis.Netlify?.env?.get?.(name) || process.env[name];
+}
+
 function createUserSupabaseClient(accessToken) {
-  const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+  const supabaseUrl = env("VITE_SUPABASE_URL") || env("SUPABASE_URL");
+  const supabaseAnonKey = env("VITE_SUPABASE_ANON_KEY") || env("SUPABASE_ANON_KEY");
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error("SUPABASE_PUBLIC_CONFIG_MISSING");
@@ -47,6 +51,26 @@ function createUserSupabaseClient(accessToken) {
 function getMonthStartIso() {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+}
+
+function extractAnswer(payload) {
+  if (!payload || typeof payload !== "object") return "";
+  if (typeof payload.output_text === "string" && payload.output_text.trim()) return payload.output_text.trim();
+  const output = Array.isArray(payload.output) ? payload.output : [];
+  const chunks = [];
+  for (const item of output) {
+    const contents = Array.isArray(item?.content) ? item.content : [];
+    for (const part of contents) {
+      if (typeof part?.text === "string") chunks.push(part.text);
+      if (typeof part?.output_text === "string") chunks.push(part.output_text);
+      if (typeof part?.content === "string") chunks.push(part.content);
+    }
+  }
+  if (chunks.length) return chunks.join("\n").trim();
+  const message = Array.isArray(payload.choices) ? payload.choices[0]?.message?.content : null;
+  if (typeof message === "string") return message.trim();
+  if (Array.isArray(message)) return message.map((part) => part?.text || part?.content || "").join("").trim();
+  return "";
 }
 
 export default async function handler(request) {
@@ -122,39 +146,52 @@ export default async function handler(request) {
     return json("Monthly AI limit reached for your current plan.", 429);
   }
 
-  if (!process.env.OPENAI_API_KEY) {
+  const openAiKey = env("OPENAI_API_KEY");
+  if (!openAiKey) {
     return json("AI Coach is temporarily unavailable.", 503);
   }
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
-      input: [
-        {
-          role: "system",
-          content: "You are AthleteOS, a careful Taekwondo performance assistant. Give practical, age-safe, non-medical guidance. Encourage professional medical help for injuries."
-        },
-        {
-          role: "user",
-          content: `Topic: ${topic}\nAthlete request: ${prompt}`
-        }
-      ]
-    })
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(new Error("timeout")), 20000);
+  let response;
+  try {
+    response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${openAiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: env("OPENAI_MODEL") || "gpt-4.1-mini",
+        input: [
+          {
+            role: "system",
+            content: "You are AthleteOS, a careful Taekwondo performance assistant. Give practical, age-safe, non-medical guidance. Encourage professional medical help for injuries."
+          },
+          {
+            role: "user",
+            content: `Topic: ${topic}\nAthlete request: ${prompt}`
+          }
+        ]
+      }),
+      signal: controller.signal
+    });
+  } catch (error) {
+    clearTimeout(timeout);
+    if (controller.signal.aborted) {
+      return json("AI Coach request timed out. Please try again.", 504);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     return json("AI Coach request failed. Please try again later.", 502);
   }
 
-  const answer = payload.output_text
-    || payload.output?.flatMap(item => item.content || []).map(item => item.text || "").join("")
-    || "No response generated.";
+  const answer = extractAnswer(payload) || "No response generated.";
 
   const { error: meterError } = await supabase.from("ai_usage_events").insert({
     user_id: userId,
@@ -164,7 +201,10 @@ export default async function handler(request) {
   });
 
   if (meterError) {
-    return json("AI usage could not be recorded. Please try again.", 503);
+    return Response.json({
+      answer,
+      warning: "AI response generated, but usage metering will be retried later."
+    });
   }
 
   return Response.json({ answer });

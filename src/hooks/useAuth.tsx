@@ -20,6 +20,7 @@ interface AuthContextValue {
   emailVerified: boolean;
   signUp: (credentials: SignUpCredentials) => Promise<void>;
   signIn: (credentials: Credentials) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   resendVerification: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
@@ -40,6 +41,9 @@ function toSafeAuthError(error: unknown, fallback: string) {
   }
   if (lower.includes("invalid login credentials")) {
     return new Error("The email or password is incorrect.");
+  }
+  if (lower.includes("provider") || lower.includes("oauth")) {
+    return new Error("Google sign-in is not available yet. Check the Supabase Google provider and redirect URL configuration.");
   }
   if (lower.includes("already registered") || lower.includes("already exists")) {
     return new Error("An account with this email may already exist. Try logging in or resetting your password.");
@@ -107,6 +111,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error) throw error;
       } catch (error) {
         throw toSafeAuthError(error, "Login could not be completed. Please try again.");
+      }
+    },
+    async signInWithGoogle() {
+      try {
+        const { error } = await requireSupabase().auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo: `${window.location.origin}/auth/callback`,
+            queryParams: {
+              access_type: "offline",
+              prompt: "consent"
+            }
+          }
+        });
+        if (error) throw error;
+      } catch (error) {
+        throw toSafeAuthError(error, "Google sign-in could not be started. Please try again.");
       }
     },
     async resetPassword(email) {

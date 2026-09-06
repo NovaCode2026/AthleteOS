@@ -13,9 +13,13 @@ function json(payload, status = 200) {
   return Response.json(payload, { status });
 }
 
+function env(name) {
+  return globalThis.Netlify?.env?.get?.(name) || process.env[name];
+}
+
 function createUserSupabaseClient(accessToken) {
-  const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+  const supabaseUrl = env("VITE_SUPABASE_URL") || env("SUPABASE_URL");
+  const supabaseAnonKey = env("VITE_SUPABASE_ANON_KEY") || env("SUPABASE_ANON_KEY");
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error("SUPABASE_PUBLIC_CONFIG_MISSING");

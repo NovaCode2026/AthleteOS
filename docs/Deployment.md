@@ -15,6 +15,16 @@
    - local equivalents for development, such as `http://localhost:5173/auth/callback`
 9. Configure the Confirm signup email template using `docs/Supabase_Email_Template.html`.
 
+### Google OAuth
+
+Google sign-in is configuration-dependent. The frontend starts OAuth through Supabase and never stores Google client IDs or secrets. To enable it for production:
+
+1. Configure the Google provider in Supabase Auth Providers.
+2. Store the Google OAuth client ID and client secret only in Supabase/Google Cloud, not in this repository.
+3. Add the deployed `/auth/callback` URL to Supabase Auth redirect URLs.
+4. Add Supabase's Google callback URL to the Google Cloud OAuth client.
+5. Test an actual Google login before marking Google OAuth live.
+
 ### First Admin Promotion
 
 Newly registered profiles default to the non-admin `user` role. Do not hardcode an admin email in the app. To create the first admin, a Supabase project owner should verify the trusted user's Auth UID and run this in the Supabase SQL Editor:

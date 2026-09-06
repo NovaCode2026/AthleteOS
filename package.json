@@ -17,10 +17,10 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/build.mjs",
     "preview": "vite preview",
-    "check": "vite build",
-    "test": "vite build"
+    "check": "node scripts/build.mjs",
+    "test": "node scripts/logic-tests.mjs && node scripts/build.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
