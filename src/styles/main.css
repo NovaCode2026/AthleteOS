@@ -235,6 +235,28 @@ dialog::backdrop { background: rgba(2, 8, 19, 0.7); }
   gap: 14px;
 }
 
+.oauth-btn {
+  width: 100%;
+  margin: 14px 0 6px;
+}
+
+.oauth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0 16px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.oauth-divider::before,
+.oauth-divider::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--line);
+}
+
 .auth-links {
   display: flex;
   flex-wrap: wrap;

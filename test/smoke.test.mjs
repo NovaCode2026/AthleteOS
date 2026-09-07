@@ -10,6 +10,6 @@ test("package metadata is valid", () => {
 });
 
 test("required build and test scripts exist", () => {
-  assert.equal(packageJson.scripts.build, "vite build");
-  assert.equal(packageJson.scripts.test, "node --test");
+  assert.equal(packageJson.scripts.build, "node scripts/build.mjs");
+  assert.equal(packageJson.scripts.test, "node --test && node scripts/logic-tests.mjs");
 });

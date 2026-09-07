@@ -25,7 +25,7 @@ export interface Profile {
   plan_id?: PlanId;
   verified_athlete?: boolean;
   founder_badge?: boolean;
-  role?: "athlete" | "coach" | "academy_admin" | "support_admin" | "admin" | "super_admin";
+  role?: "user" | "athlete" | "coach" | "academy_admin" | "support_admin" | "admin" | "super_admin";
 }
 
 export interface TrainingSession {
@@ -102,6 +102,7 @@ export interface FeedbackItem {
   details?: string;
   status?: string;
   priority?: string;
+  visibility?: "public" | "private";
 }
 
 export interface VerificationRequest {

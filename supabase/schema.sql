@@ -24,7 +24,7 @@ create table if not exists public.profiles (
   plan_id text not null default 'free' check (plan_id in ('free','student','pro','champion','academy')),
   verified_athlete boolean not null default false,
   founder_badge boolean not null default false,
-  role text not null default 'athlete' check (role in ('athlete','coach','academy_admin','support_admin','admin','super_admin')),
+  role text not null default 'user' check (role in ('user','athlete','coach','academy_admin','support_admin','admin','super_admin')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -252,9 +252,20 @@ create table if not exists public.feedback_items (
   details text,
   status text not null default 'new' check (status in ('new','reviewing','planned','closed')),
   priority text not null default 'normal' check (priority in ('low','normal','high')),
+  visibility text not null default 'public' check (visibility in ('public','private')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.profiles drop constraint if exists profiles_role_check;
+alter table public.profiles
+  add constraint profiles_role_check check (role in ('user','athlete','coach','academy_admin','support_admin','admin','super_admin'));
+alter table public.profiles alter column role set default 'user';
+
+alter table public.feedback_items add column if not exists visibility text not null default 'public';
+alter table public.feedback_items drop constraint if exists feedback_items_visibility_check;
+alter table public.feedback_items
+  add constraint feedback_items_visibility_check check (visibility in ('public','private'));
 
 create table if not exists public.roadmap_items (
   id uuid primary key default gen_random_uuid(),

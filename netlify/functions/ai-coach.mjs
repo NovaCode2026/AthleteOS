@@ -27,9 +27,13 @@ function json(error, status) {
   return Response.json({ error }, { status });
 }
 
+function env(name) {
+  return globalThis.Netlify?.env?.get?.(name) || process.env[name];
+}
+
 function createUserSupabaseClient(accessToken) {
-  const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+  const supabaseUrl = env("VITE_SUPABASE_URL") || env("SUPABASE_URL");
+  const supabaseAnonKey = env("VITE_SUPABASE_ANON_KEY") || env("SUPABASE_ANON_KEY");
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error("SUPABASE_PUBLIC_CONFIG_MISSING");
@@ -50,22 +54,24 @@ async function cancelReservation(supabase, reservationId, userId) {
 }
 
 function extractResponseText(payload) {
-  if (typeof payload?.output_text === "string" && payload.output_text.trim()) {
-    return payload.output_text.trim();
-  }
+  if (!payload || typeof payload !== "object") return "";
+  if (typeof payload.output_text === "string" && payload.output_text.trim()) return payload.output_text.trim();
 
-  const output = Array.isArray(payload?.output) ? payload.output : [];
-  const parts = [];
+  const output = Array.isArray(payload.output) ? payload.output : [];
+  const chunks = [];
   for (const item of output) {
-    const content = Array.isArray(item?.content) ? item.content : [];
-    for (const block of content) {
-      if (typeof block?.text === "string") parts.push(block.text);
-      else if (typeof block?.text?.value === "string") parts.push(block.text.value);
+    const contents = Array.isArray(item?.content) ? item.content : [];
+    for (const part of contents) {
+      if (typeof part?.text === "string") chunks.push(part.text);
+      if (typeof part?.output_text === "string") chunks.push(part.output_text);
+      if (typeof part?.content === "string") chunks.push(part.content);
     }
   }
-
-  const answer = parts.join("").trim();
-  return answer || null;
+  if (chunks.length) return chunks.join("\n").trim();
+  const message = Array.isArray(payload.choices) ? payload.choices[0]?.message?.content : null;
+  if (typeof message === "string") return message.trim();
+  if (Array.isArray(message)) return message.map((part) => part?.text || part?.content || "").join("").trim();
+  return null;
 }
 
 export default async function handler(request) {
@@ -128,7 +134,8 @@ export default async function handler(request) {
   if (reservationError) return json("Unable to reserve your monthly AI usage. Please try again.", 503);
   if (!reservationId) return json("Monthly AI limit reached for your current plan.", 429);
 
-  if (!process.env.OPENAI_API_KEY) {
+  const openAiKey = env("OPENAI_API_KEY");
+  if (!openAiKey) {
     await cancelReservation(supabase, reservationId, userId);
     return json("AI Coach is temporarily unavailable.", 503);
   }
@@ -141,15 +148,21 @@ export default async function handler(request) {
     response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${openAiKey}`,
         "Content-Type": "application/json"
       },
       signal: controller.signal,
       body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
+        model: env("OPENAI_MODEL") || "gpt-4.1-mini",
         input: [
-          { role: "system", content: "You are AthleteOS, a careful Taekwondo performance assistant. Give practical, age-safe, non-medical guidance. Encourage professional medical help for injuries." },
-          { role: "user", content: `Topic: ${topic}\nAthlete request: ${prompt}` }
+          {
+            role: "system",
+            content: "You are AthleteOS, a careful Taekwondo performance assistant. Give practical, age-safe, non-medical guidance. Encourage professional medical help for injuries."
+          },
+          {
+            role: "user",
+            content: `Topic: ${topic}\nAthlete request: ${prompt}`
+          }
         ]
       })
     });
