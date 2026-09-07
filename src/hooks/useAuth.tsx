@@ -28,6 +28,7 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const GOOGLE_OAUTH_TIMEOUT_MS = 15000;
 
 function toSafeAuthError(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message : "";
@@ -61,9 +62,35 @@ function toSafeAuthError(error: unknown, fallback: string) {
   return new Error(message || fallback);
 }
 
+function addGoogleButtonBranding() {
+  if (typeof document === "undefined") return undefined;
+  const styleId = "athleteos-google-auth-branding";
+  if (document.getElementById(styleId)) return undefined;
+
+  const style = document.createElement("style");
+  style.id = styleId;
+  style.textContent = `
+    .oauth-btn { gap: 10px; }
+    .oauth-btn::before {
+      content: "";
+      width: 18px;
+      height: 18px;
+      flex: 0 0 18px;
+      background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%234285F4' d='M21.35 12.27c0-.79-.07-1.55-.2-2.27H12v4.3h5.24a4.48 4.48 0 0 1-1.94 2.94v2.45h3.14c1.84-1.69 2.91-4.18 2.91-7.42z'/%3E%3Cpath fill='%2334A853' d='M12 21.5c2.63 0 4.84-.87 6.45-2.36l-3.14-2.45c-.87.58-1.98.92-3.31.92-2.54 0-4.69-1.72-5.46-4.03H3.3v2.53A9.74 9.74 0 0 0 12 21.5z'/%3E%3Cpath fill='%23FBBC05' d='M6.54 12.66A5.84 5.84 0 0 1 6.23 11c0-.58.11-1.14.31-1.66V6.81H3.3A9.74 9.74 0 0 0 2.25 11c0 1.57.38 3.05 1.05 4.19l3.24-2.53z'/%3E%3Cpath fill='%23EA4335' d='M12 5.31c1.43 0 2.71.49 3.72 1.45l2.79-2.79C16.84 2.43 14.63 1.5 12 1.5a9.74 9.74 0 0 0-8.7 5.31l3.24 2.53C7.31 7.03 9.46 5.31 12 5.31z'/%3E%3C/svg%3E");
+    }
+  `;
+  document.head.appendChild(style);
+  return () => style.remove();
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const removeGoogleBranding = addGoogleButtonBranding();
+    return () => removeGoogleBranding?.();
+  }, []);
 
   useEffect(() => {
     if (!supabase) {
@@ -71,17 +98,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return undefined;
     }
 
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
+    let active = true;
+    supabase.auth.getSession()
+      .then(({ data }) => {
+        if (!active) return;
+        setSession(data.session);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setSession(null);
+        setLoading(false);
+      });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (!active) return;
       setSession(nextSession);
       setLoading(false);
     });
 
-    return () => listener.subscription.unsubscribe();
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   const value = useMemo<AuthContextValue>(() => ({
@@ -115,7 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     async signInWithGoogle() {
       try {
-        const { error } = await requireSupabase().auth.signInWithOAuth({
+        const oauthPromise = requireSupabase().auth.signInWithOAuth({
           provider: "google",
           options: {
             redirectTo: `${window.location.origin}/auth/callback`,
@@ -125,6 +164,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           }
         });
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          window.setTimeout(() => reject(new Error("Google sign-in timed out. Please check your connection and try again.")), GOOGLE_OAUTH_TIMEOUT_MS);
+        });
+        const { error } = await Promise.race([oauthPromise, timeoutPromise]);
         if (error) throw error;
       } catch (error) {
         throw toSafeAuthError(error, "Google sign-in could not be started. Please try again.");
