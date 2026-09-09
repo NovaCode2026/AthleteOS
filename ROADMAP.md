@@ -18,6 +18,11 @@
 - Supabase realtime notifications
 - Import workflow for legacy AthleteOS backups
 - Test suite with component and integration coverage
+- Deterministic tournament/internet scanner with official-source discovery and scheduled change detection
+
+## Deferred
+
+- WhatsApp Groups API integration — revisit after Nova Code can satisfy Meta's current Groups API/OBA eligibility requirements; do not block V1 on this dependency
 
 ## Future
 
