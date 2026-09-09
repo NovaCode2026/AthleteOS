@@ -30,15 +30,13 @@ function firstMatch(text, patterns) {
 export function extractDate(value) {
   if (!value) return null;
   const normalized = value.trim();
-  const direct = new Date(normalized);
-  if (!Number.isNaN(direct.getTime())) return direct.toISOString().slice(0, 10);
-
   const dmy = normalized.match(/(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);
   if (dmy) {
     const parsed = new Date(`${dmy[3]}-${dmy[2]}-${dmy[1]}T00:00:00Z`);
     return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
   }
-  return null;
+  const direct = new Date(normalized);
+  return Number.isNaN(direct.getTime()) ? null : direct.toISOString().slice(0, 10);
 }
 
 export function extractPdfLinks(html, baseUrl) {
@@ -96,19 +94,14 @@ export async function fetchSource(sourceUrl) {
         Accept: "text/html, text/plain, application/xhtml+xml, application/xml;q=0.9"
       }
     });
-
     if (!response.ok) throw new Error(`HTTP_${response.status}`);
     const contentType = (response.headers.get("content-type") || "").toLowerCase();
-    if (!/(text\/html|text\/plain|application\/xhtml\+xml|application\/rss\+xml|application\/xml)/.test(contentType)) {
-      throw new Error("UNSUPPORTED_CONTENT");
-    }
-
+    if (!/(text\/html|text\/plain|application\/xhtml\+xml|application\/rss\+xml|application\/xml)/.test(contentType)) throw new Error("UNSUPPORTED_CONTENT");
     const contentLength = Number(response.headers.get("content-length") || 0);
     if (contentLength > MAX_RESPONSE_BYTES) throw new Error("SOURCE_TOO_LARGE");
 
     const reader = response.body?.getReader();
     if (!reader) return { html: await response.text(), contentType };
-
     const chunks = [];
     let total = 0;
     while (true) {
@@ -121,14 +114,12 @@ export async function fetchSource(sourceUrl) {
       }
       chunks.push(value);
     }
-
     const merged = new Uint8Array(total);
     let offset = 0;
     for (const chunk of chunks) {
       merged.set(chunk, offset);
       offset += chunk.byteLength;
     }
-
     return { html: new TextDecoder().decode(merged), contentType };
   } finally {
     clearTimeout(timeout);
