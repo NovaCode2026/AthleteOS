@@ -2,6 +2,10 @@ import { createClient } from "@supabase/supabase-js";
 
 const APP_ORIGIN = "https://athleteostkd.netlify.app";
 
+function env(name) {
+  return Netlify.env.get(name);
+}
+
 function redirect(path, params = {}) {
   const url = new URL(path, APP_ORIGIN);
   for (const [key, value] of Object.entries(params)) {
@@ -11,15 +15,15 @@ function redirect(path, params = {}) {
 }
 
 function getServerSupabase() {
-  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = env("SUPABASE_URL") || env("VITE_SUPABASE_URL");
+  const key = env("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !key) throw new Error("SUPABASE_SERVER_CONFIG_MISSING");
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
 async function exchangeCode(code, redirectUri) {
-  const appId = process.env.INSTAGRAM_APP_ID;
-  const appSecret = process.env.INSTAGRAM_APP_SECRET;
+  const appId = env("INSTAGRAM_APP_ID");
+  const appSecret = env("INSTAGRAM_APP_SECRET");
   if (!appId || !appSecret) throw new Error("INSTAGRAM_SERVER_CONFIG_MISSING");
 
   const body = new URLSearchParams({
@@ -45,7 +49,7 @@ async function exchangeCode(code, redirectUri) {
 }
 
 async function exchangeForLongLivedToken(shortLivedToken) {
-  const appSecret = process.env.INSTAGRAM_APP_SECRET;
+  const appSecret = env("INSTAGRAM_APP_SECRET");
   if (!appSecret) throw new Error("INSTAGRAM_SERVER_CONFIG_MISSING");
 
   const url = new URL("https://graph.instagram.com/access_token");
@@ -91,7 +95,7 @@ export default async function handler(request) {
   }
   if (!code || !state) return redirect("/", { instagram: "error", reason: "missing_state" });
 
-  const redirectUri = process.env.INSTAGRAM_REDIRECT_URI || "https://athleteostkd.netlify.app/.netlify/functions/instagram-callback";
+  const redirectUri = env("INSTAGRAM_REDIRECT_URI") || "https://athleteostkd.netlify.app/.netlify/functions/instagram-callback";
 
   try {
     const supabase = getServerSupabase();
