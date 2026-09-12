@@ -18,7 +18,9 @@ export function calculateReadiness(data: CloudData): number {
   const profileScore = profileFields.filter((value) => value !== undefined && value !== null && String(value).trim() !== "").length / profileFields.length;
 
   const trainingScore = Math.min(1, data.training.length / 8);
-  const goalsScore = data.goals.length === 0 ? 0 : Math.min(1, data.goals.filter((goal) => String((goal as any).status || "").toLowerCase() === "completed").length / data.goals.length);
+  const goalsScore = data.goals.length === 0
+    ? 0
+    : data.goals.reduce((sum, goal) => sum + Math.max(0, Math.min(100, Number(goal.progress || 0))), 0) / data.goals.length / 100;
   const checklistScore = data.checklist.length === 0 ? 0 : data.checklist.filter((item) => Boolean((item as any).completed || (item as any).is_completed)).length / data.checklist.length;
   const tournamentScore = data.tournaments.length > 0 ? Math.min(1, data.tournaments.length / 3) : 0;
   const documentsScore = Math.min(1, data.documents.length / 3);
