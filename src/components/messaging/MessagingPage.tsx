@@ -4,22 +4,17 @@ import { requireSupabase } from "../../lib/supabase";
 
 type Conversation = { id: string; kind: "direct" | "group"; name?: string | null; created_by: string; created_at: string };
 type Message = { id: string; conversation_id: string; sender_id: string; body: string; message_type: string; created_at: string };
-
 type Props = { userId?: string; role?: string; setToast: (toast: { type: "success" | "error" | "warning"; message: string } | null) => void };
 
 const messageTypes = [
-  ["normal", "Normal message"],
-  ["tournament_announcement", "Tournament announcement"],
-  ["training_schedule", "Training schedule"],
-  ["training_plan", "Training plan"],
-  ["document", "Document"],
-  ["team_announcement", "Team announcement"]
+  ["normal", "Normal message"], ["tournament_announcement", "Tournament announcement"], ["training_schedule", "Training schedule"],
+  ["training_plan", "Training plan"], ["document", "Document"], ["team_announcement", "Team announcement"]
 ] as const;
 
 export default function MessagingPage({ userId, role, setToast }: Props) {
   const supabase = requireSupabase();
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [selectedId, setSelectedId] = useState<string>("");
+  const [selectedId, setSelectedId] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [recipientEmail, setRecipientEmail] = useState("");
   const [groupName, setGroupName] = useState("");
@@ -28,103 +23,44 @@ export default function MessagingPage({ userId, role, setToast }: Props) {
   const [messageType, setMessageType] = useState("normal");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-
   const selected = useMemo(() => conversations.find((item) => item.id === selectedId), [conversations, selectedId]);
   const canCreateGroup = ["coach", "academy_admin", "admin", "super_admin"].includes(role || "");
   const selectedIsGroupCreator = Boolean(selected?.kind === "group" && selected.created_by === userId);
 
   async function loadConversations() {
     if (!userId) return;
-    const { data, error: queryError } = await supabase
-      .from("conversations")
-      .select("id, kind, name, created_by, created_at")
-      .order("created_at", { ascending: false });
+    const { data, error: queryError } = await supabase.from("conversations").select("id, kind, name, created_by, created_at").order("created_at", { ascending: false });
     if (queryError) throw queryError;
     setConversations((data ?? []) as Conversation[]);
     if (!selectedId && data?.[0]?.id) setSelectedId(data[0].id);
   }
-
   async function loadMessages(conversationId: string) {
-    const { data, error: queryError } = await supabase
-      .from("messages")
-      .select("id, conversation_id, sender_id, body, message_type, created_at")
-      .eq("conversation_id", conversationId)
-      .order("created_at", { ascending: true });
+    const { data, error: queryError } = await supabase.from("messages").select("id, conversation_id, sender_id, body, message_type, created_at").eq("conversation_id", conversationId).order("created_at", { ascending: true });
     if (queryError) throw queryError;
     setMessages((data ?? []) as Message[]);
   }
-
-  useEffect(() => {
-    void loadConversations().catch((e) => setError(e instanceof Error ? e.message : "Messages could not be loaded."));
-  }, [userId]);
-
-  useEffect(() => {
-    if (!selectedId) {
-      setMessages([]);
-      return;
-    }
-    void loadMessages(selectedId).catch((e) => setError(e instanceof Error ? e.message : "Conversation could not be loaded."));
-  }, [selectedId]);
+  useEffect(() => { void loadConversations().catch((e) => setError(e instanceof Error ? e.message : "Messages could not be loaded.")); }, [userId]);
+  useEffect(() => { if (!selectedId) { setMessages([]); return; } void loadMessages(selectedId).catch((e) => setError(e instanceof Error ? e.message : "Conversation could not be loaded.")); }, [selectedId]);
 
   async function startDirect(event: React.FormEvent) {
-    event.preventDefault();
-    if (!recipientEmail.trim()) return;
-    setBusy(true); setError("");
-    try {
-      const { data, error: rpcError } = await supabase.rpc("create_direct_conversation", { p_recipient_email: recipientEmail.trim() });
-      if (rpcError) throw rpcError;
-      setSelectedId(String(data));
-      setRecipientEmail("");
-      await loadConversations();
-      setToast({ type: "success", message: "Direct conversation created. Only its two members can read it." });
-    } catch (e) { setError(e instanceof Error ? e.message : "Direct conversation could not be created."); }
-    finally { setBusy(false); }
+    event.preventDefault(); if (!recipientEmail.trim()) return; setBusy(true); setError("");
+    try { const { data, error: rpcError } = await supabase.rpc("create_direct_conversation", { p_recipient_email: recipientEmail.trim() }); if (rpcError) throw rpcError; setSelectedId(String(data)); setRecipientEmail(""); await loadConversations(); setToast({ type: "success", message: "Direct conversation created. Only its two members can read it." }); }
+    catch (e) { setError(e instanceof Error ? e.message : "Direct conversation could not be created."); } finally { setBusy(false); }
   }
-
   async function createGroup(event: React.FormEvent) {
-    event.preventDefault();
-    if (!canCreateGroup || !groupName.trim()) return;
-    setBusy(true); setError("");
-    try {
-      const { data, error: rpcError } = await supabase.rpc("create_group_conversation", { p_name: groupName.trim() });
-      if (rpcError) throw rpcError;
-      setSelectedId(String(data));
-      setGroupName("");
-      await loadConversations();
-      setToast({ type: "success", message: "Group created. Messages will be delivered only to its members." });
-    } catch (e) { setError(e instanceof Error ? e.message : "Group could not be created."); }
-    finally { setBusy(false); }
+    event.preventDefault(); if (!canCreateGroup || !groupName.trim()) return; setBusy(true); setError("");
+    try { const { data, error: rpcError } = await supabase.rpc("create_group_conversation", { p_name: groupName.trim() }); if (rpcError) throw rpcError; setSelectedId(String(data)); setGroupName(""); await loadConversations(); setToast({ type: "success", message: "Group created. Messages will be delivered only to its members." }); }
+    catch (e) { setError(e instanceof Error ? e.message : "Group could not be created."); } finally { setBusy(false); }
   }
-
   async function addMember(event: React.FormEvent) {
-    event.preventDefault();
-    if (!selectedId || !memberEmail.trim()) return;
-    setBusy(true); setError("");
-    try {
-      const { error: rpcError } = await supabase.rpc("add_group_member_by_email", { p_conversation_id: selectedId, p_email: memberEmail.trim() });
-      if (rpcError) throw rpcError;
-      setMemberEmail("");
-      setToast({ type: "success", message: "Member added to this group." });
-    } catch (e) { setError(e instanceof Error ? e.message : "Member could not be added."); }
-    finally { setBusy(false); }
+    event.preventDefault(); if (!selectedId || !memberEmail.trim()) return; setBusy(true); setError("");
+    try { const { error: rpcError } = await supabase.rpc("add_group_member_by_email", { p_conversation_id: selectedId, p_email: memberEmail.trim() }); if (rpcError) throw rpcError; setMemberEmail(""); setToast({ type: "success", message: "Member added to this group." }); }
+    catch (e) { setError(e instanceof Error ? e.message : "Member could not be added."); } finally { setBusy(false); }
   }
-
   async function sendMessage(event: React.FormEvent) {
-    event.preventDefault();
-    if (!selectedId || !body.trim() || !userId) return;
-    setBusy(true); setError("");
-    try {
-      const { error: insertError } = await supabase.from("messages").insert({
-        conversation_id: selectedId,
-        sender_id: userId,
-        body: body.trim(),
-        message_type: messageType
-      });
-      if (insertError) throw insertError;
-      setBody("");
-      await loadMessages(selectedId);
-    } catch (e) { setError(e instanceof Error ? e.message : "Message could not be sent."); }
-    finally { setBusy(false); }
+    event.preventDefault(); if (!selectedId || !body.trim() || !userId) return; setBusy(true); setError("");
+    try { const { error: insertError } = await supabase.from("messages").insert({ conversation_id: selectedId, sender_id: userId, body: body.trim(), message_type: messageType }); if (insertError) throw insertError; setBody(""); await loadMessages(selectedId); }
+    catch (e) { setError(e instanceof Error ? e.message : "Message could not be sent."); } finally { setBusy(false); }
   }
 
   return <FeaturePageLike title="Messages">
