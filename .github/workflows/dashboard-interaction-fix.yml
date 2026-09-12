@@ -1,0 +1,98 @@
+name: Dashboard interaction fix
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix-dashboard:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply dashboard interaction fix
+        shell: python
+        run: |
+          from pathlib import Path
+
+          app_path = Path("src/App.tsx")
+          text = app_path.read_text()
+          start = text.find("function Dashboard({ data, usage, openForm }:")
+          end = text.find("\nfunction PlansPage(", start)
+          if start < 0 or end < 0:
+              raise SystemExit("Dashboard boundaries not found")
+
+          new_dashboard = '''function Dashboard({ data, usage, goToPage }: { data: CloudData; usage: UsageSummary; goToPage: (page: PageId) => void }) {
+  return <>
+    <AthleteCommandCenter data={data} />
+    <section className="dashboard-secondary">
+      <div className="grid two dashboard-secondary-grid">
+        <section className="card panel dashboard-ai-usage">
+          <div className="section-heading"><div><span className="eyebrow">AI</span><h3>AI usage</h3></div><Sparkles size={18} /></div>
+          <button type="button" className="dashboard-interactive-card" onClick={() => goToPage("ai")} aria-label="Open AI Coach">
+            <Stat icon={Sparkles} label="AI usage" value={`${usage.used}/${usage.limit}`} note={usage.plan.name} />
+            <span className="dashboard-open-hint">Open AI Coach →</span>
+          </button>
+        </section>
+        <section className="card panel dashboard-weight-trend">
+          <div className="section-heading"><div><span className="eyebrow">Progress</span><h3>Weight trend</h3></div><Weight size={18} /></div>
+          <button type="button" className="dashboard-chart-button" onClick={() => goToPage("weight")} aria-label="Open Weight tracking">
+            <div className="dashboard-chart-wrap">
+              <ResponsiveContainer width="100%" height={260}>
+                <LineChart data={data.weights} margin={{ top: 12, right: 16, left: 0, bottom: 12 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#25405f" />
+                  <XAxis dataKey="logged_at" tick={{ fontSize: 11 }} minTickGap={18} />
+                  <YAxis width={42} domain={["auto", "auto"]} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="weight_kg" stroke="#49d7ff" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 7 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <span className="dashboard-open-hint">Open Weight tracking →</span>
+          </button>
+        </section>
+      </div>
+    </section>
+  </>;
+}'''
+          text = text[:start] + new_dashboard + text[end:]
+          old = '<Dashboard data={data} usage={usage} openForm={openForm} />'
+          new = '<Dashboard data={data} usage={usage} goToPage={setPage} />'
+          if old not in text:
+              raise SystemExit("Dashboard render call not found")
+          text = text.replace(old, new, 1)
+          app_path.write_text(text)
+
+          css_path = Path("src/styles/main.css")
+          css = css_path.read_text()
+          marker = "/* ATHLETEOS_DASHBOARD_INTERACTIONS_V1 */"
+          if marker not in css:
+              css += '''
+
+/* ATHLETEOS_DASHBOARD_INTERACTIONS_V1 */
+.dashboard-ai-usage, .dashboard-weight-trend { min-width: 0; overflow: hidden; }
+.dashboard-interactive-card, .dashboard-chart-button { width: 100%; border: 0; background: transparent; color: inherit; text-align: left; padding: 0; cursor: pointer; display: block; }
+.dashboard-interactive-card { position: relative; border-radius: 12px; padding: 4px; transition: transform .18s ease, background .18s ease; }
+.dashboard-interactive-card:hover, .dashboard-chart-button:hover { transform: translateY(-1px); background: rgba(73,215,255,.05); }
+.dashboard-interactive-card:focus-visible, .dashboard-chart-button:focus-visible { outline: 2px solid #49d7ff; outline-offset: 3px; border-radius: 10px; }
+.dashboard-interactive-card .metric { margin: 0; width: 100%; }
+.dashboard-open-hint { display: block; margin: 8px 4px 0; color: #49d7ff; font-size: .78rem; font-weight: 700; }
+.dashboard-chart-button { border-radius: 12px; padding: 2px 0 0; transition: transform .18s ease, background .18s ease; }
+.dashboard-chart-wrap { width: 100%; min-width: 0; overflow: hidden; }
+.dashboard-chart-wrap .recharts-responsive-container { width: 100% !important; min-width: 0 !important; max-width: 100%; }
+@media (max-width: 900px) { .dashboard-secondary-grid { grid-template-columns: 1fr !important; } }
+'''
+          css_path.write_text(css)
+
+      - name: Commit dashboard interaction fix
+        shell: bash
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.tsx src/styles/main.css
+          git commit -m "feat: make dashboard AI and weight cards interactive"
+          git push
