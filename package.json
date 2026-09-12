@@ -6,7 +6,7 @@
   "type": "module",
   "keywords": ["athleteos", "taekwondo", "react", "typescript", "vite", "supabase", "netlify", "openai", "sports-tech"],
   "author": "Nova Code",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "homepage": "https://github.com/NovaCode2026/AthleteOS#readme",
   "repository": {
     "type": "git",
