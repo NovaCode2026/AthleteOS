@@ -23,10 +23,10 @@ export default async function handler(request) {
   if (!url || !key) return json({ error: "Server configuration is incomplete." }, 503);
   try {
     const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-    const { data, error } = await supabase.from("instagram_discovery_connections").select("status,token_expires_at,username").eq("user_id", user.id).maybeSingle();
+    const { data, error } = await supabase.from("instagram_discovery_connections").select("status,token_expires_at,instagram_username").eq("user_id", user.id).maybeSingle();
     if (error) return json({ error: "Unable to check Instagram connection." }, 503);
     const active = data?.status === "active" && (!data.token_expires_at || new Date(data.token_expires_at).getTime() > Date.now());
-    return json({ connected: active, username: active ? data.username : null });
+    return json({ connected: active, username: active ? data.instagram_username : null });
   } catch (error) {
     console.error("instagram-discovery-status", error);
     return json({ error: "Unable to check Instagram connection." }, 503);
