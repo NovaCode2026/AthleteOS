@@ -10,8 +10,15 @@ if (!source.includes('import InstagramOrganizerScanner from "./components/instag
 }
 
 const oldLine = 'else if (page === "scanner") content = <TournamentScannerPage scans={data.tournamentScans} planId={plan.id} accessToken={auth.session?.access_token} refresh={refresh} setToast={setToast} />;';
-const newLine = 'else if (page === "scanner") content = <><TournamentScannerPage scans={data.tournamentScans} planId={plan.id} accessToken={auth.session?.access_token} refresh={refresh} setToast={setToast} /><InstagramOrganizerScanner accessToken={auth.session?.access_token} setToast={setToast} /></>';
-if (!source.includes(oldLine) && !source.includes(newLine)) throw new Error("Scanner page anchor not found");
-source = source.replace(oldLine, newLine);
+const duplicateLine = 'else if (page === "scanner") content = <><TournamentScannerPage scans={data.tournamentScans} planId={plan.id} accessToken={auth.session?.access_token} refresh={refresh} setToast={setToast} /><InstagramOrganizerScanner accessToken={auth.session?.access_token} setToast={setToast} /></>';
+const unifiedLine = 'else if (page === "scanner") content = <><TournamentScannerPage scans={data.tournamentScans} planId={plan.id} accessToken={auth.session?.access_token} refresh={refresh} setToast={setToast} /><InstagramOrganizerScanner accessToken={auth.session?.access_token} setToast={setToast} /></>';
+
+if (source.includes(duplicateLine)) {
+  source = source.replace(duplicateLine, unifiedLine);
+} else if (source.includes(oldLine)) {
+  source = source.replace(oldLine, unifiedLine);
+} else {
+  throw new Error("Scanner page anchor not found; refusing unsafe rewrite");
+}
 
 fs.writeFileSync(path, source);
