@@ -1,3 +1,4 @@
+import "../styles/interactions.css";
 import { requireSupabase } from "../lib/supabase";
 
 export const TABLES = {
@@ -12,6 +13,23 @@ export async function insertRow<T extends Record<string, unknown>>(resource: Res
 export async function updateRow<T extends Record<string, unknown>>(resource: Resource, id: string, values: T, userId?: string) { const table = TABLES[resource]; let query = requireSupabase().from(table).update(values).eq("id", id); if (userId) query = query.eq("user_id", userId); const { data, error } = await query.select().single(); if (error) throw toDatabaseError(resource, "save", error); return data; }
 export async function deleteRow(resource: Resource, id: string, userId?: string) { const table = TABLES[resource]; let query = requireSupabase().from(table).delete().eq("id", id); if (userId) query = query.eq("user_id", userId); const { error } = await query; if (error) throw toDatabaseError(resource, "delete", error); }
 export async function insertManyRows<T extends Record<string, unknown>>(resource: Resource, values: T[]) { const table = TABLES[resource]; const { data, error } = await requireSupabase().from(table).insert(values).select(); if (error) throw toDatabaseError(resource, "save", error); return data; }
-export async function uploadPrivateFile(bucket: string, path: string, file: File) { if (!file || file.size <= 0) throw new Error("The selected file is empty."); const { data, error } = await requireSupabase().storage.from(bucket).upload(path, file, { upsert: true, cacheControl: "3600", contentType: file.type || "application/octet-stream" }); if (error) throw new Error(import.meta.env.DEV ? error.message : "Unable to upload the file securely. Please try again."); return data.path; }
+
+const FILE_UPLOAD_TIMEOUT_MS = 30_000;
+export async function uploadPrivateFile(bucket: string, path: string, file: File) {
+  if (!file || file.size <= 0) throw new Error("The selected file is empty.");
+  if (!bucket || !path) throw new Error("The file destination is missing.");
+  const upload = requireSupabase().storage.from(bucket).upload(path, file, {
+    upsert: true,
+    cacheControl: "3600",
+    contentType: file.type || "application/octet-stream"
+  });
+  const timeout = new Promise<never>((_, reject) => {
+    window.setTimeout(() => reject(new Error("File upload timed out. Please check your connection and try again.")), FILE_UPLOAD_TIMEOUT_MS);
+  });
+  const { data, error } = await Promise.race([upload, timeout]);
+  if (error) throw new Error(import.meta.env.DEV ? error.message : "Unable to upload the file securely. Please try again.");
+  if (!data?.path) throw new Error("The file upload did not return a storage path.");
+  return data.path;
+}
 export async function createSignedFileUrl(bucket: string, path: string) { const { data, error } = await requireSupabase().storage.from(bucket).createSignedUrl(path, 60); if (error) throw new Error(import.meta.env.DEV ? error.message : "Unable to open this document right now."); return data.signedUrl; }
 export async function deletePrivateFile(bucket: string, path: string) { const { error } = await requireSupabase().storage.from(bucket).remove([path]); if (error) throw new Error(import.meta.env.DEV ? error.message : "Unable to delete the stored file."); }
