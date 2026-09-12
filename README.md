@@ -138,30 +138,9 @@ docs/
 - Competition checklist
 - AI Coach with plan-aware limits
 - Feedback portal
-- Public roadmap
-- Admin command-center foundation
-- Support, announcements, feature flags, and audit-log foundations
-
-## Roadmap
-
-- Server-enforced AI quota writes in Netlify Functions
-- Payment checkout endpoints for Razorpay, Stripe, and Cashfree
-- File upload UI for verification and certificates
-- Athlete Resume PDF generator
-- Academy roster management
-- Coach dashboards, attendance, and training plans
-- Support/admin operations and audit reporting
-- Realtime notifications and analytics
 
 ## License
 
-MIT License. Copyright (c) 2026 Nova Code.
+AthleteOS is proprietary software owned by **Nova Code**. It is **not released under the MIT License** or another open-source licence unless a specific component is expressly identified as being separately licensed.
 
-## Developer
-
-Built and maintained by **Nova Code**.
-
-GitHub: [NovaCode2026/AthleteOS](https://github.com/NovaCode2026/AthleteOS)
-
-
-Currently under development 
+See [`LICENSE`](./LICENSE) for the complete **AthleteOS Proprietary Software Licence**, including the Indian statutory provisions referenced by the licence.
