@@ -1,12 +1,12 @@
-insert into storage.buckets (id, name, public)
+insert into storage.buckets (id, name, public, file_size_limit)
 values
-  ('profile-images', 'profile-images', false),
-  ('medal-images', 'medal-images', false),
-  ('certificates', 'certificates', false),
-  ('documents', 'documents', false),
-  ('verification-proofs', 'verification-proofs', false),
-  ('academy-media', 'academy-media', false)
-on conflict (id) do update set public = excluded.public;
+  ('profile-images', 'profile-images', false, 5242880),
+  ('medal-images', 'medal-images', false, 5242880),
+  ('certificates', 'certificates', false, 5242880),
+  ('documents', 'documents', false, 5242880),
+  ('verification-proofs', 'verification-proofs', false, 5242880),
+  ('academy-media', 'academy-media', false, 5242880)
+on conflict (id) do update set public = excluded.public, file_size_limit = excluded.file_size_limit;
 
 drop policy if exists "Users can upload own profile images" on storage.objects;
 create policy "Users can upload own profile images"

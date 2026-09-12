@@ -788,7 +788,7 @@ function RecordModal({ form, setForm, save, profile }: {
     calendar: [["title", "Event"], ["event_date", "Date", "date"], ["event_type", "Type"], ["reminder_at", "Reminder", "datetime-local"]],
     checklist: [["item", "Item"], ["category", "Category"]],
     feedback: [["title", "Title"], ["details", "Details"], ["priority", "Priority"]],
-    verifications: [["document_type", "Proof type", "select", ["school_id", "fee_receipt", "bonafide"]], ["file_path", "Storage file path"], ["status", "Status", "select", ["pending", "approved", "rejected"]]]
+    verifications: [["document_type", "Proof type", "select", ["school_id", "fee_receipt", "bonafide"]]]
   } as Partial<Record<Resource, Array<[string, string, string?, string[]?]>>>)[form.resource] || [];
 
   async function submit(event: React.FormEvent) {
@@ -796,11 +796,15 @@ function RecordModal({ form, setForm, save, profile }: {
     setSaving(true);
     try {
       const payload = { ...values };
-      if (form.resource === "documents" && file) {
+      if (form.resource === "documents" || form.resource === "verifications") {
         if (!userId) throw new Error("Please sign in again before uploading.");
-        const extension = file.name.includes(".") ? file.name.split(".").pop() : "bin";
-        const safeName = `${crypto.randomUUID()}.${extension}`;
-        payload.file_path = await uploadPrivateFile("documents", `${userId}/${safeName}`, file);
+        if (!file) throw new Error("Please choose a document to upload.");
+        if (file.size > 5 * 1024 * 1024) throw new Error("The selected file must be 5 MB or smaller.");
+        const extension = file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() : "bin";
+        const safeName = `${crypto.randomUUID()}.${extension || "bin"}`;
+        const bucket = form.resource === "verifications" ? "verification-proofs" : "documents";
+        payload.file_path = await uploadPrivateFile(bucket, `${userId}/${safeName}`, file);
+        if (form.resource === "verifications") payload.status = "pending";
       }
       await save(form.resource, payload);
     } finally {
@@ -808,7 +812,7 @@ function RecordModal({ form, setForm, save, profile }: {
     }
   }
 
-  return <div className="modal-backdrop"><form className="modal" onSubmit={(event) => { void submit(event); }}><button type="button" className="close" onClick={() => setForm(null)} aria-label="Close">x</button><h2>{form.resource}</h2>{fields.map(([name, label, type = "text", options]) => options ? <SelectField key={name} label={label} value={String(values[name] || "")} onChange={(event) => setValues({ ...values, [name]: event.target.value })}><option value="">Select</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</SelectField> : <Field key={name} label={label} type={type} value={String(values[name] || "")} onChange={(event) => setValues({ ...values, [name]: type === "number" ? Number(event.target.value) : event.target.value })} />)}{form.resource === "documents" && <label className="field"><span>Upload file</span><input type="file" onChange={(event) => setFile(event.target.files?.[0] || null)} /></label>}<button className="btn primary" disabled={saving}>{saving ? "Saving..." : "Save"}</button></form></div>;
+  return <div className="modal-backdrop"><form className="modal" onSubmit={(event) => { void submit(event); }}><button type="button" className="close" onClick={() => setForm(null)} aria-label="Close">x</button><h2>{form.resource}</h2>{fields.map(([name, label, type = "text", options]) => options ? <SelectField key={name} label={label} value={String(values[name] || "")} onChange={(event) => setValues({ ...values, [name]: event.target.value })}><option value="">Select</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</SelectField> : <Field key={name} label={label} type={type} value={String(values[name] || "")} onChange={(event) => setValues({ ...values, [name]: type === "number" ? Number(event.target.value) : event.target.value })} />)}{(form.resource === "documents" || form.resource === "verifications") && <label className="field"><span>Upload file (max 5 MB)</span><input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" required onChange={(event) => setFile(event.target.files?.[0] || null)} /></label>}<button className="btn primary" disabled={saving}>{saving ? "Saving..." : "Save"}</button></form></div>;
 }
 
 function ProtectedApp() {

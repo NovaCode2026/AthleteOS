@@ -101,7 +101,7 @@ export async function insertManyRows<T extends Record<string, unknown>>(resource
 export async function uploadPrivateFile(bucket: string, path: string, file: File) {
   if (!(file instanceof File)) throw new Error("Please choose a file first.");
   if (file.size <= 0) throw new Error("The selected file is empty.");
-  if (file.size > 10 * 1024 * 1024) throw new Error("The selected file must be 10 MB or smaller.");
+  if (file.size > 5 * 1024 * 1024) throw new Error("The selected file must be 5 MB or smaller.");
 
   const { data, error } = await requireSupabase().storage.from(bucket).upload(path, file, {
     upsert: true,
