@@ -1,0 +1,141 @@
+/* Interaction polish: every clickable control gets a clear hover, focus and press state. */
+button,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:not(:disabled):focus-visible,
+[role="button"]:focus-visible,
+input[type="button"]:focus-visible,
+input[type="submit"]:focus-visible,
+input[type="reset"]:focus-visible,
+a:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.btn,
+.icon-btn,
+.plain,
+.sidebar nav button,
+.logout,
+.metric-button,
+.goal-button,
+.list-row,
+.auth-links button,
+.close,
+.month button,
+.checklist label {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn:not(:disabled):active,
+.icon-btn:not(:disabled):active,
+.plain:not(:disabled):active,
+.sidebar nav button:not(:disabled):active,
+.logout:not(:disabled):active,
+.metric-button:not(:disabled):active,
+.goal-button:not(:disabled):active,
+.list-row:not(:disabled):active,
+.auth-links button:not(:disabled):active,
+.close:not(:disabled):active,
+.month button:not(:disabled):active {
+  transform: translateY(1px) scale(.985);
+}
+
+.btn:disabled,
+.icon-btn:disabled,
+.plain:disabled,
+.sidebar nav button:disabled,
+.logout:disabled,
+.metric-button:disabled,
+.goal-button:disabled,
+.list-row:disabled,
+.auth-links button:disabled,
+.close:disabled {
+  pointer-events: none;
+}
+
+.metric-button {
+  width: 100%;
+  border: 1px solid var(--line);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.metric-button:hover { border-color: var(--line-strong); background: linear-gradient(145deg, rgba(31,62,94,.88), rgba(8,22,39,.94)); }
+.metric-button:focus-visible { border-color: var(--cyan); }
+
+.goal-button,
+.list-row {
+  width: 100%;
+  border: 1px solid transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.goal-button:hover,
+.list-row:hover { border-color: var(--line); background: rgba(53,101,150,.12); }
+
+.auth-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 14px; }
+.auth-links button {
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 7px 9px;
+  background: transparent;
+  color: #9fc0df;
+  font-size: 12px;
+  cursor: pointer;
+}
+.auth-links button:hover { border-color: var(--line); background: rgba(120,170,220,.08); color: #e4f3ff; }
+
+.close {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(104,150,199,.1);
+  color: var(--muted);
+  cursor: pointer;
+}
+.close:hover { color: white; border-color: var(--line-strong); background: rgba(104,150,199,.2); }
+
+.field input[type="file"] {
+  width: 100%;
+  padding: 9px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: rgba(7,18,32,.6);
+  color: var(--text);
+  cursor: pointer;
+}
+.field input[type="file"]::file-selector-button {
+  margin-right: 10px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(49,152,255,.16);
+  color: #e7f5ff;
+  font-weight: 750;
+  cursor: pointer;
+}
+.field input[type="file"]::file-selector-button:hover { background: rgba(49,152,255,.25); border-color: var(--line-strong); }
+
+button[type="submit"] { cursor: pointer; }
+button[type="submit"]:disabled { cursor: wait; }
+
+@media (max-width: 760px) {
+  .auth-links button { min-height: 40px; padding: 9px 10px; }
+  .btn, .icon-btn { min-height: 44px; }
+  .plain { min-height: 38px; }
+  .metric-button { min-height: 96px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
