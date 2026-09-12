@@ -1,340 +1,269 @@
-ATHLETEOS PROPRIETARY SOFTWARE LICENSE
+ATHLETEOS PROPRIETARY SOFTWARE LICENCE
 Copyright (c) 2026 Nova Code
 All Rights Reserved.
 
 PROJECT: AthleteOS
 OWNER: Nova Code
 STATUS: PROPRIETARY SOFTWARE
+JURISDICTION: INDIA
 
+IMPORTANT: This licence governs original AthleteOS material owned or controlled by Nova Code. It does not remove or limit rights that Indian law does not permit a contract or licence to remove or limit. Third-party materials remain governed by their own licences.
 
-1. OWNERSHIP
+1. DEFINITIONS
 
-AthleteOS, including its original source code, object code, software
-architecture, application structure, user interface, visual designs,
-graphics, logos, icons, documentation, database structure, original
-content, original algorithms, original features, configuration,
-scripts, and other original materials, is the intellectual property
-of Nova Code, except for third-party materials that are separately
-licensed by their respective owners.
+1.1 “AthleteOS” means the AthleteOS software and original project materials made available by or on behalf of Nova Code, including source code, object code, software architecture, application structure, user interface, visual designs, graphics, logos, icons, documentation, database schema and structure, original content, original implementation, configuration, scripts, and other original materials, except Third-Party Materials.
 
-All rights not expressly granted by Nova Code are reserved.
+1.2 “Nova Code” means the owner or rights-holder identified in this licence as Nova Code.
 
+1.3 “Third-Party Materials” means libraries, frameworks, packages, fonts, icons, APIs, services, code, content, or other material owned or licensed by a person other than Nova Code.
 
-2. PROPRIETARY STATUS
+1.4 “Authorised User” means a person or organisation that has received an express written licence or other permission from Nova Code to use specified AthleteOS material.
 
-AthleteOS is proprietary software and is NOT released under an
-open-source license.
+2. OWNERSHIP AND RESERVATION OF RIGHTS
 
-The availability of AthleteOS or any portion of its source code on
-GitHub, a website, a development environment, a demonstration,
-a preview, or any other location does not grant the public permission
-to copy, modify, distribute, sell, sublicense, or otherwise exploit
-the software.
+2.1 Subject to third-party rights and rights of contributors or other persons that have not been assigned to Nova Code, Nova Code claims and reserves all intellectual-property rights that it owns in original AthleteOS material.
 
-Access does not equal ownership or permission.
+2.2 For computer-programme components, section 14(b) of the Copyright Act, 1957 sets out exclusive rights of a copyright owner in a computer programme, subject to that Act.
 
+2.3 Accessing, downloading, viewing, testing, or using AthleteOS does not by itself transfer copyright, trademark rights, patent rights, design rights, trade-secret rights, database rights, or other intellectual-property rights.
 
-3. NO GENERAL LICENSE
+2.4 All rights not expressly granted by Nova Code are reserved, subject to rights expressly preserved by Indian law.
 
-Unless Nova Code provides explicit written permission, no person or
-organization is granted the right to:
+3. PROPRIETARY AND NON-OPEN-SOURCE STATUS
 
-- Copy AthleteOS or its source code.
-- Reproduce substantial portions of AthleteOS.
-- Modify, adapt, translate, or create derivative works.
-- Distribute or redistribute AthleteOS or its source code.
-- Publish or republish the source code.
-- Sell, resell, rent, lease, sublicense, or commercialize AthleteOS.
-- Use the source code to create a competing product or service.
-- Repackage AthleteOS or substantial portions of it as another product.
-- Upload substantial portions of the source code to another repository,
-  website, marketplace, package registry, or code-sharing platform.
-- Remove copyright, ownership, proprietary, or attribution notices.
-- Claim ownership or authorship of Nova Code's original work.
-- Represent yourself as the creator, owner, developer, or authorized
-  representative of AthleteOS or Nova Code.
-- Use AthleteOS branding in a way that suggests unauthorized affiliation,
-  sponsorship, endorsement, or ownership.
-- Use confidential or non-public AthleteOS information for unauthorized
-  purposes.
+3.1 AthleteOS is proprietary software. It is not released under the MIT License, GNU General Public License, Apache License, or another open-source licence unless Nova Code expressly publishes a separate licence for a specific component.
 
+3.2 Public availability of AthleteOS or source code on GitHub, a website, development environment, demonstration, preview, package registry, or other location does not by itself grant a copyright licence beyond rights expressly granted by Nova Code or rights arising independently under law.
 
-4. PERSONAL AND NON-COMMERCIAL USE
+3.3 Repository visibility, source-file visibility, an issue, pull request, documentation page, demo, or other public project material does not constitute permission to reproduce, modify, distribute, commercialise, or create derivative works from Nova Code’s protected material.
 
-No general right of personal, educational, research, or
-non-commercial use is granted by this license.
+4. LIMITED LICENCE; NO GENERAL PUBLIC LICENCE
 
-Such use may be permitted only when Nova Code has expressly authorized it
-or when otherwise permitted by applicable law.
+4.1 Unless Nova Code expressly grants a written licence, no general licence is granted to copy, distribute, publish, modify, adapt, translate, sell, rent, lease, sublicense, commercialise, or create derivative works from original protected portions of AthleteOS.
 
+4.2 A specific licence granted by Nova Code is limited to the scope, purpose, duration, territory, and other conditions expressly stated in the relevant written grant.
 
-5. SOURCE CODE
+4.3 A licence to use AthleteOS does not automatically include a licence to use Nova Code trademarks, private infrastructure, credentials, confidential information, or unrelated Nova Code projects.
 
-The AthleteOS source code is proprietary.
+5. PROHIBITED UNAUTHORISED USE
 
-No person receiving access to source code is granted ownership of that
-source code.
+Except to the extent expressly permitted by Nova Code or by a mandatory provision of Indian law, a person must not:
 
-Unauthorized copying, redistribution, publication, modification,
-commercialization, or creation of competing products from the source
-code is prohibited to the maximum extent permitted by applicable law.
+- reproduce or distribute protected AthleteOS source code or substantial protected portions of it;
+- publish or republish protected source code or substantial protected portions of it;
+- modify, adapt, translate, or create derivative works from protected AthleteOS material;
+- sell, rent, lease, sublicense, or commercially redistribute protected AthleteOS material;
+- package or repackage substantial protected portions of AthleteOS as another product;
+- upload protected source code to another repository, marketplace, package registry, website, or code-sharing service without permission;
+- remove or intentionally obscure copyright, proprietary, or attribution notices;
+- falsely claim authorship or ownership of Nova Code’s original protected material; or
+- use AthleteOS branding in a manner that falsely suggests affiliation, sponsorship, endorsement, partnership, or ownership.
 
-Private or unreleased source code must not be publicly disclosed without
-authorization from Nova Code.
+5.2 This section does not prohibit acts expressly permitted under section 52 or another applicable provision of the Copyright Act, 1957, or another mandatory law.
 
+6. SOURCE CODE AND COMPUTER SYSTEMS
 
-6. CONTRIBUTIONS AND SUBMISSIONS
+6.1 AthleteOS source code is proprietary except for portions expressly identified as Third-Party Materials or separately licensed by Nova Code.
 
-AthleteOS may allow athletes, coaches, developers, users, testers, or
-other individuals to submit:
+6.2 Access to source code does not transfer ownership of the source code.
 
-- Code
-- Suggestions
-- Ideas
-- Feature requests
-- Bug reports
-- Designs
-- Documentation
-- Improvements
-- Feedback
-- Other project-related materials
+6.3 Depending on the facts and statutory requirements, unauthorised access to, alteration of, deletion of, or interference with computer resources may engage sections 43 and 66 of the Information Technology Act, 2000.
 
-Submitting any material does NOT automatically grant Nova Code
-permission to add that material to AthleteOS.
+6.4 Section 65 of the Information Technology Act, 2000 addresses tampering with computer source documents required to be kept or maintained by law. This licence does not itself create a criminal offence; the statutory requirements determine whether particular conduct is unlawful.
 
-No submission may be directly added to the official AthleteOS
-codebase, production application, official documentation, official
-repository, or other official project materials without prior review
-and approval by an authorized representative of Nova Code.
+7. COPYRIGHT AND STATUTORY RIGHTS
 
-Nova Code may review, reject, accept, request changes to, or decline
-any submission, subject to applicable law and any separate written
-agreement.
+7.1 The Copyright Act, 1957 applies to AthleteOS to the extent the relevant material is protected by copyright and owned or controlled by Nova Code.
 
-A submission is not considered accepted merely because it was:
+7.2 Section 14 of the Copyright Act, 1957 sets out the exclusive rights of a copyright owner, including specific rights concerning computer programmes.
 
-- Received
-- Viewed
-- Reviewed
-- Discussed
-- Tested
-- Displayed
-- Stored
-- Referenced
-- Acknowledged
+7.3 Section 17 addresses first ownership of copyright, subject to its statutory provisions and applicable agreements or exceptions.
 
-Only an expressly approved submission may be incorporated into
-AthleteOS.
+7.4 Sections 18 and 19 govern assignments of copyright and impose statutory requirements on assignments. A contribution or submission does not transfer copyright to Nova Code merely because it was submitted unless a valid assignment or other legal basis for transfer exists.
 
-Where Nova Code provides a separate contributor or assignment agreement,
-that agreement will govern ownership and licensing of an accepted
-contribution.
+7.5 Section 30 permits licensing by a copyright owner or duly authorised person. Any licence granted by Nova Code is limited to rights actually owned or controlled by Nova Code.
 
-Nothing in this section automatically transfers ownership of a
-submission to Nova Code unless a separate agreement or applicable law
-provides for such transfer.
+7.6 Section 51 identifies circumstances in which copyright is infringed, while section 55 provides civil remedies for infringement. Nova Code reserves remedies available under those provisions and other applicable law.
 
+7.7 Section 58 provides rights concerning infringing copies and plates in specified circumstances.
 
-7. CONTRIBUTION REVIEW
+7.8 Section 63 provides criminal consequences for certain copyright infringement, and section 63B specifically addresses knowingly using an infringing copy of a computer programme in specified circumstances. Whether a criminal provision applies depends on the conduct and statutory requirements; this licence does not independently create criminal liability.
 
-All proposed contributions may be subject to technical, security,
-quality, compatibility, legal, licensing, privacy, and product review.
+7.9 Nothing in this licence waives or restricts statutory exceptions under section 52 of the Copyright Act, 1957, including provisions concerning lawful possession of a computer programme, interoperability, observation/study/testing, and specified personal use where their statutory conditions are satisfied.
 
-Nova Code may modify or reject a proposed contribution before it is
-incorporated into AthleteOS.
+8. CONTRIBUTIONS AND SUBMISSIONS
 
-Approval of one submission does not constitute approval of future
-submissions.
+8.1 AthleteOS may accept code, suggestions, ideas, feature requests, bug reports, designs, documentation, improvements, feedback, or other project-related materials.
 
-No individual contributor has authority to directly merge, publish,
-deploy, or incorporate material into AthleteOS unless Nova Code has
-explicitly granted that authority.
+8.2 Submission alone does not transfer copyright or other intellectual-property rights to Nova Code.
 
+8.3 No submission is accepted merely because it is received, viewed, reviewed, discussed, tested, displayed, stored, referenced, or acknowledged.
 
-8. THIRD-PARTY SOFTWARE
+8.4 A contribution may be incorporated only after review and approval by an authorised representative of Nova Code.
 
-AthleteOS may use third-party libraries, frameworks, packages, services,
-fonts, icons, APIs, or other materials.
+8.5 Where Nova Code and a contributor execute a separate contributor, assignment, employment, contractor, or licence agreement, that agreement governs ownership and licensing to the extent legally valid.
 
-Third-party materials remain the property of their respective owners
-and are governed by their applicable licenses.
+8.6 Any copyright assignment intended to transfer rights to Nova Code should comply with sections 18 and 19 of the Copyright Act, 1957.
 
-This license does not replace, revoke, or override valid rights granted
-under third-party licenses.
+8.7 Nova Code may reject or request changes to a proposed contribution for technical, security, quality, compatibility, legal, licensing, privacy, or product reasons.
 
-Third-party dependencies may be listed separately in project
-documentation or dependency files.
+9. THIRD-PARTY MATERIALS
 
+9.1 AthleteOS may contain Third-Party Materials.
 
-9. TRADEMARKS AND BRANDING
+9.2 Third-Party Materials remain subject to their respective licences and ownership rights.
 
-The names "AthleteOS" and "Nova Code", together with associated logos,
-visual identities, slogans, icons, designs, and other branding, may be
-protected trademarks, service marks, or other intellectual property.
+9.3 This licence does not revoke, restrict, or replace a valid third-party licence.
 
-This license does not grant permission to use such trademarks or
-branding.
+9.4 Rights granted by a third-party licence that cannot lawfully be restricted by this licence remain available to the extent of that licence.
 
-Unauthorized use that falsely suggests affiliation, sponsorship,
-endorsement, partnership, or ownership is prohibited to the maximum
-extent permitted by applicable law.
+9.5 Third-party dependencies may be identified in package manifests, notices, documentation, or separate licence files.
 
+10. TRADEMARKS AND BRANDING
 
-10. CONFIDENTIAL INFORMATION
+10.1 “AthleteOS”, “Nova Code”, and associated logos, names, slogans, visual identities, icons, and other branding may be protected by trademark or other intellectual-property law.
 
-Non-public AthleteOS source code, credentials, API keys, tokens,
-database credentials, security information, internal documentation,
-unreleased features, business information, customer information,
-private project discussions, and other information identified or
-reasonably understood to be confidential must not be disclosed,
-published, sold, transferred, or used for unauthorized purposes.
+10.2 This licence does not grant a trademark licence unless Nova Code expressly grants one in writing.
 
-Nothing in this section restricts rights that cannot legally be
-restricted.
+10.3 The Trade Marks Act, 1999 governs registered trademarks and related rights. Section 28 addresses rights conferred by registration, section 29 addresses infringement of registered trademarks, and section 30 sets out limits on the effect of registered trademark rights.
 
+10.4 Section 27 of the Trade Marks Act, 1999 addresses actions concerning unregistered trademarks and passing off. Nothing in this licence removes rights or remedies available under that provision.
 
-11. SECURITY AND CREDENTIALS
+10.5 Nothing in this section prohibits lawful descriptive, nominative, comparative, or other use permitted by the Trade Marks Act, 1999.
 
-Nothing in this license grants permission to access, test, modify,
-interfere with, bypass, disable, or circumvent security controls,
-authentication systems, databases, infrastructure, APIs, accounts,
-or other systems belonging to Nova Code or AthleteOS.
+11. CONFIDENTIAL INFORMATION
 
-Passwords, API keys, access tokens, private keys, secrets, and other
-authentication credentials must not be copied, disclosed, published,
-or used without authorization.
+11.1 Non-public source code, credentials, API keys, access tokens, database credentials, security information, internal documentation, unreleased features, non-public business information, private project discussions, and other information reasonably understood to be confidential must not be disclosed or used for an unauthorised purpose.
 
+11.2 This section does not prohibit disclosure required by law, lawful reporting to a competent authority, or conduct that cannot legally be restricted.
 
-12. USER DATA AND PRIVACY
+11.3 Sections 72 and 72A of the Information Technology Act, 2000 may apply to unauthorised disclosure of information or personal information in circumstances covered by those provisions. Their statutory requirements determine whether an offence or liability exists.
 
-AthleteOS may process information belonging to athletes, coaches,
-academies, administrators, or other users.
+12. SECURITY, ACCESS, AND CREDENTIALS
 
-This license does not grant permission to access, copy, disclose,
-sell, export, scrape, or otherwise process personal information
-belonging to AthleteOS users or other individuals.
+12.1 No permission is granted by this licence to access, test, modify, interfere with, bypass, disable, or circumvent security controls, authentication systems, databases, infrastructure, APIs, accounts, or other systems belonging to Nova Code or AthleteOS.
 
-Any processing of personal information must comply with applicable
-privacy laws, privacy policies, contracts, and other applicable
-requirements.
+12.2 Passwords, API keys, access tokens, private keys, secrets, and other authentication credentials must not be copied, disclosed, published, or used without authorisation.
 
+12.3 Conduct involving unauthorised access, copying, extraction, alteration, disruption, or damage to a computer resource may engage section 43 of the Information Technology Act, 2000 and, where its statutory conditions are met, section 66 of that Act.
 
-13. NO UNAUTHORIZED COMPETITIVE USE
+13. USER DATA AND PRIVACY
 
-Without written permission from Nova Code, the source code or
-substantial portions of the original AthleteOS implementation may not
-be used to create, operate, or assist in creating a substantially
-similar competing software product or service.
+13.1 This software licence does not grant permission to access, copy, disclose, sell, export, scrape, or otherwise process personal data belonging to AthleteOS users or other individuals.
 
-This provision does not claim ownership over general programming
-concepts, ideas, methods, techniques, or independently created software
-that does not infringe Nova Code's intellectual property rights.
+13.2 AthleteOS may process athlete, coach, academy, administrator, or other user information as described in the applicable privacy notice and service terms.
 
+13.3 To the extent the Digital Personal Data Protection Act, 2023 and its rules are in force and apply to the relevant processing, processing must comply with the Act, including sections 4 to 10 concerning grounds and obligations for processing, notice, consent, legitimate uses, general obligations, children's personal data, and significant data fiduciary obligations, as applicable.
 
-14. NO AUTOMATIC TRANSFER OF RIGHTS
+13.4 Sections 11 to 15 of the Digital Personal Data Protection Act, 2023 address rights and duties of Data Principals, including access information, correction and erasure, grievance redressal, nomination, and duties. Nothing in this licence removes those statutory rights when the Act applies.
 
-Downloading, viewing, accessing, contributing to, testing, or using
-AthleteOS does not transfer any copyright, trademark, patent,
-trade-secret, database, design, or other intellectual property rights.
+13.5 Section 9 of the Digital Personal Data Protection Act, 2023 contains additional requirements concerning processing personal data of children. Where that provision is in force and applies, AthleteOS processing must be operated consistently with those requirements.
 
-Any transfer of intellectual property ownership must be established
-through a separate written agreement signed by an authorized
-representative of Nova Code.
+13.6 The Digital Personal Data Protection Act, 2023 was brought into force in phases by Government notification. The 13 November 2025 commencement notification schedules sections 3 to 17, among other provisions, for commencement eighteen months after that notification. References in this licence to those provisions are therefore subject to their actual commencement and applicability at the relevant time.
 
+13.7 The Digital Personal Data Protection Rules, 2025 are also subject to their notified commencement schedule. Where the Rules apply, AthleteOS must comply with the applicable provisions.
 
-15. COPYRIGHT NOTICES
+14. NO UNAUTHORISED COPYING OR MISAPPROPRIATION
 
-Copyright and proprietary notices included in AthleteOS or its
-authorized materials must not be removed, altered, or obscured without
-permission.
+14.1 Nova Code does not claim ownership of general programming ideas, abstract algorithms, methods, techniques, functional requirements, or independently created software merely because they are similar to AthleteOS.
 
-Copyright in original portions of AthleteOS belongs to Nova Code,
-subject to applicable law and valid rights belonging to third parties.
+14.2 Copying protected source code, protected expression, original protected content, confidential implementation material, or other protected Nova Code material without permission may constitute infringement or another unlawful act.
 
+14.3 This section is not intended to impose a general restraint on lawful competition or independent development and must be interpreted consistently with section 27 of the Indian Contract Act, 1872 and other mandatory law.
+
+15. NO AUTOMATIC TRANSFER OF RIGHTS
+
+Downloading, viewing, accessing, contributing to, testing, or using AthleteOS does not transfer ownership of any copyright, trademark, patent, design, trade-secret, database, or other intellectual-property right.
+
+Any transfer of ownership must be supported by a legally valid written instrument where applicable law requires one.
 
 16. NO WARRANTY
 
-TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, ATHLETEOS IS
-PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTIES OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, AVAILABILITY,
-SECURITY, OR UNINTERRUPTED OPERATION.
+TO THE MAXIMUM EXTENT PERMITTED BY INDIAN LAW, ATHLETEOS IS PROVIDED “AS IS” AND “AS AVAILABLE”, WITHOUT WARRANTIES OTHER THAN THOSE THAT CANNOT LAWFULLY BE EXCLUDED.
 
-NOVA CODE DOES NOT WARRANT THAT ATHLETEOS WILL BE ERROR-FREE,
-SECURE, COMPATIBLE WITH EVERY ENVIRONMENT, OR AVAILABLE AT ALL TIMES.
+TO THE EXTENT PERMITTED BY LAW, NOVA CODE DOES NOT WARRANT THAT ATHLETEOS WILL BE ERROR-FREE, SECURE, COMPATIBLE WITH EVERY ENVIRONMENT, AVAILABLE AT ALL TIMES, OR UNINTERRUPTED.
 
+NOTHING IN THIS SECTION EXCLUDES A WARRANTY, CONDITION, RIGHT, OR REMEDY THAT CANNOT LAWFULLY BE EXCLUDED OR LIMITED.
 
 17. LIMITATION OF LIABILITY
 
-TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, NOVA CODE SHALL
-NOT BE LIABLE FOR INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL,
-EXEMPLARY, OR PUNITIVE DAMAGES ARISING FROM OR RELATED TO THE USE,
-INABILITY TO USE, OR MISUSE OF ATHLETEOS.
+TO THE MAXIMUM EXTENT PERMITTED BY INDIAN LAW, NOVA CODE SHALL NOT BE LIABLE FOR INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR PUNITIVE LOSS ARISING FROM USE OR INABILITY TO USE ATHLETEOS, EXCEPT TO THE EXTENT SUCH LIABILITY CANNOT LAWFULLY BE EXCLUDED OR LIMITED.
 
-NOTHING IN THIS LICENSE EXCLUDES OR LIMITS LIABILITY THAT CANNOT
-LAWFULLY BE EXCLUDED OR LIMITED.
+NOTHING IN THIS LICENCE EXCLUDES OR LIMITS LIABILITY, STATUTORY RIGHTS, OR REMEDIES THAT CANNOT LAWFULLY BE EXCLUDED OR LIMITED, INCLUDING mandatory rights under applicable consumer, data-protection, intellectual-property, or other legislation.
 
+18. TERMINATION OF EXPRESS PERMISSIONS
 
-18. TERMINATION OF AUTHORIZED PERMISSIONS
+18.1 An express permission granted by Nova Code may terminate according to the terms of the relevant written permission or agreement.
 
-Any permission granted by Nova Code under a separate written agreement
-may be terminated according to the terms of that agreement.
+18.2 If a person exceeds the scope of an express permission, the person must cease the unauthorised activity, subject to rights and remedies available under applicable law.
 
-If a person uses AthleteOS outside the permission granted to them,
-that unauthorized use must cease immediately, subject to applicable law.
+18.3 Termination does not affect obligations that by their nature survive termination, including ownership, confidentiality, intellectual-property rights, and accrued remedies.
 
+19. ENFORCEMENT AND REMEDIES
 
-19. ENFORCEMENT
+19.1 Nova Code reserves civil remedies available under the Copyright Act, 1957, including section 55 where applicable, and other Indian laws.
 
-Nova Code reserves all rights and remedies available under applicable
-law regarding unauthorized copying, reproduction, distribution,
-publication, modification, commercialization, disclosure,
-misrepresentation, infringement, or other unauthorized exploitation
-of AthleteOS or Nova Code's intellectual property.
+19.2 Depending on the conduct and statutory requirements, unauthorised computer access, damage, extraction, alteration, or source-code tampering may also engage provisions of the Information Technology Act, 2000, including sections 43, 65 and 66.
 
+19.3 A particular act does not automatically constitute an offence merely because this licence mentions a statute. The relevant statute and its required elements determine liability.
 
-20. GOVERNING LAW
+19.4 Nova Code may seek injunctions, damages, accounts, delivery-up, or other remedies where legally available.
 
-This license shall be interpreted and enforced according to applicable
-law and the jurisdiction governing the relevant parties, subject to
-mandatory legal requirements that cannot be waived by agreement.
+20. CONTRACTUAL VALIDITY AND MANDATORY LAW
 
+20.1 To the extent this licence forms a contract, its enforceability is subject to the Indian Contract Act, 1872 and other applicable law.
 
-21. PERMISSION REQUESTS
+20.2 Section 10 of the Indian Contract Act, 1872 addresses when agreements become contracts, including free consent, competency, lawful consideration, and lawful object.
 
-Requests for permission to copy, modify, distribute, publish,
-commercialize, integrate, reproduce, or otherwise use proprietary
-portions of AthleteOS should be directed to Nova Code through its
-officially designated contact channel.
+20.3 Section 11 addresses competency to contract. Where an individual is not competent to enter a binding contract under applicable law, this licence does not remove that legal requirement.
 
-Where this license requires written permission, permission must be
-provided by an authorized representative of Nova Code.
+20.4 Section 23 addresses agreements with unlawful consideration or objects. No provision of this licence authorises an unlawful act.
 
+20.5 Section 27 addresses agreements in restraint of trade. This licence is not intended to create an unlawful general restraint on trade or lawful competition.
 
-22. RESERVED RIGHTS
+20.6 Section 28 addresses agreements restricting legal proceedings. Nothing in this licence is intended to unlawfully restrict a party’s statutory right to pursue legal remedies.
 
-All rights not expressly granted in this license are reserved by
-Nova Code.
+21. GOVERNING LAW AND JURISDICTION
 
-No implied license or permission is granted.
+21.1 This licence shall be governed by and interpreted in accordance with the laws of the Republic of India.
 
-Silence, inaction, public availability, repository visibility,
-discussion, review, or receipt of a submission does not constitute
-permission.
+21.2 Subject to mandatory jurisdictional rules, courts having lawful jurisdiction in India may determine disputes arising from this licence.
 
+21.3 Nothing in this clause excludes a mandatory statutory forum, jurisdiction, remedy, or right that cannot legally be excluded by agreement.
 
-23. OPEN-SOURCE STATUS
+22. SEVERABILITY
 
-ATHLETEOS IS NOT OPEN SOURCE.
+If any provision of this licence is held invalid, unlawful, or unenforceable by a competent authority or court, that provision shall be enforced to the maximum lawful extent where possible, and the remaining provisions shall continue to the extent permitted by law.
 
-THIS LICENSE DOES NOT GRANT THE GENERAL PUBLIC PERMISSION TO COPY,
-MODIFY, DISTRIBUTE, SELL, REPUBLISH, REPACKAGE, OR CREATE DERIVATIVE
-WORKS FROM ATHLETEOS.
+23. NO WAIVER
 
-EXCEPT FOR RIGHTS EXPRESSLY GRANTED BY NOVA CODE, RIGHTS PROVIDED BY
-APPLICABLE LAW, AND RIGHTS ASSOCIATED WITH SEPARATELY LICENSED
-THIRD-PARTY MATERIALS, ALL RIGHTS ARE RESERVED.
+Failure by Nova Code to enforce a provision immediately does not constitute a permanent waiver unless a valid written waiver is expressly given by an authorised representative of Nova Code.
 
+24. PERMISSION REQUESTS
+
+Requests for permission to copy, modify, distribute, publish, commercialise, integrate, reproduce, or otherwise use proprietary portions of AthleteOS should be directed to Nova Code through its officially designated contact channel.
+
+Where this licence requires written permission, permission must be expressly granted by an authorised representative of Nova Code.
+
+25. RESERVED RIGHTS AND FINAL NOTICE
+
+All rights not expressly granted by Nova Code are reserved, subject to rights that Indian law expressly grants or preserves.
+
+ATHLETEOS IS PROPRIETARY SOFTWARE.
+
+THIS LICENCE DOES NOT GRANT THE GENERAL PUBLIC A LICENCE TO COPY, MODIFY, DISTRIBUTE, SELL, REPUBLISH, REPACKAGE, OR CREATE DERIVATIVE WORKS FROM NOVA CODE’S PROTECTED ATHLETEOS MATERIAL.
+
+THIRD-PARTY MATERIALS REMAIN SUBJECT TO THEIR OWN LICENCES.
+
+MANDATORY RIGHTS AND STATUTORY EXCEPTIONS UNDER INDIAN LAW REMAIN IN EFFECT.
+
+RELEVANT INDIAN LEGISLATION REFERENCED IN THIS LICENCE
+
+- The Copyright Act, 1957 — sections 14, 17, 18, 19, 30, 51, 52, 55, 58, 63 and 63B, as relevant to the circumstances.
+- The Information Technology Act, 2000 — sections 43, 65, 66, 72 and 72A, as relevant to the circumstances.
+- The Trade Marks Act, 1999 — sections 27, 28, 29 and 30, as relevant to the circumstances.
+- The Indian Contract Act, 1872 — sections 10, 11, 23, 27 and 28, as relevant to contractual validity and enforceability.
+- The Digital Personal Data Protection Act, 2023 — sections 4 to 17, when and to the extent those provisions are in force and applicable, together with the Digital Personal Data Protection Rules, 2025 where applicable.
 
 Copyright (c) 2026 Nova Code
 All Rights Reserved.
