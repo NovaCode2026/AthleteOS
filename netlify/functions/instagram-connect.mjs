@@ -1,20 +1,24 @@
 import { randomBytes } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
+function env(name) {
+  return Netlify.env.get(name);
+}
+
 function json(payload, status = 200) {
   return Response.json(payload, { status });
 }
 
 function getServerSupabase() {
-  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = env("SUPABASE_URL") || env("VITE_SUPABASE_URL");
+  const key = env("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !key) throw new Error("SUPABASE_SERVER_CONFIG_MISSING");
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
 function getUserClient(accessToken) {
-  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const key = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+  const url = env("SUPABASE_URL") || env("VITE_SUPABASE_URL");
+  const key = env("SUPABASE_ANON_KEY") || env("VITE_SUPABASE_ANON_KEY");
   if (!url || !key) throw new Error("SUPABASE_PUBLIC_CONFIG_MISSING");
   return createClient(url, key, {
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
@@ -28,8 +32,8 @@ export default async function handler(request) {
   const accessToken = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!accessToken) return json({ error: "Please sign in before connecting Instagram." }, 401);
 
-  const appId = process.env.INSTAGRAM_APP_ID;
-  const redirectUri = process.env.INSTAGRAM_REDIRECT_URI || "https://athleteostkd.netlify.app/.netlify/functions/instagram-callback";
+  const appId = env("INSTAGRAM_APP_ID");
+  const redirectUri = env("INSTAGRAM_REDIRECT_URI") || "https://athleteostkd.netlify.app/.netlify/functions/instagram-callback";
   if (!appId || !redirectUri) return json({ error: "Instagram integration is not configured on the server." }, 503);
 
   try {
