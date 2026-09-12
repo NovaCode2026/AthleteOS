@@ -1,10 +1,19 @@
 /* Dashboard lower-section fix: preserve the interactive command center above. */
-.app-shell main > .hero.card,
-.app-shell main > .metrics {
+.app-shell main > .hero.card {
   display: none !important;
 }
 
-/* Keep only the old lower AI usage tracker and remove the duplicate goals panel. */
+/* The old metric row stays, but only its AI usage tracker remains. */
+.app-shell main > .metrics > .metric:not(:last-child) {
+  display: none !important;
+}
+
+.app-shell main > .metrics {
+  grid-template-columns: minmax(0, 1fr) !important;
+  min-width: 0;
+}
+
+/* Keep the old lower weight graph; remove the duplicate Goals panel. */
 .app-shell main > .grid.two > .panel:nth-child(2) {
   display: none !important;
 }
@@ -17,11 +26,6 @@
 .app-shell main > .grid.two > .panel {
   min-width: 0;
   overflow: hidden;
-}
-
-.app-shell main > .metrics {
-  grid-template-columns: minmax(0, 1fr) !important;
-  min-width: 0;
 }
 
 .dashboard-secondary,
