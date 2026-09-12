@@ -1,0 +1,41 @@
+name: Wire unified tournament scanner
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/components/instagram/InstagramOrganizerScanner.tsx"
+      - "scripts/wire-instagram-organizer.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Wire unified scanner route
+        run: node scripts/wire-instagram-organizer.mjs
+
+      - name: Commit route update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- src/App.tsx; then
+            echo "Scanner route already unified."
+            exit 0
+          fi
+          git add src/App.tsx
+          git commit -m "fix: use unified tournament scanner route"
+          git push
