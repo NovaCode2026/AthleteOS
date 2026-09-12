@@ -18,6 +18,8 @@ import type {
   ChecklistItem, CloudData, DocumentRecord, FeedbackItem, Goal, Medal as MedalRecord,
   AiUsageEvent, Profile, RoadmapItem, RoadmapVote, Subscription, SubscriptionUsage, TournamentScan, TrainingSession, Tournament, UsageSummary, VerificationRequest, WeightLog
 } from "./types";
+import AthleteCommandCenter from "./components/dashboard/AthleteCommandCenter";
+import AdminControlCenter from "./components/admin/AdminControlCenter";
 import "./styles/main.css";
 
 type PageId = "dashboard" | "profile" | "plans" | "verification" | "tournaments" | "training" | "medals" | "documents" | "weight" | "calendar" | "checklist" | "scanner" | "ai" | "feedback" | "roadmap" | "admin";
@@ -354,6 +356,7 @@ function safeHost(url: string) {
 function Dashboard({ data, usage, openForm }: { data: CloudData; usage: UsageSummary; openForm: (resource: Resource) => void }) {
   const latestWeight = data.weights.at(-1)?.weight_kg || data.profile.weight_kg || 0;
   return <>
+    <AthleteCommandCenter data={data} />
     <section className="hero card">
       <div>
         <span className="pill">Taekwondo Edition V2</span>
@@ -581,18 +584,7 @@ function TournamentScannerPage({ scans, planId, accessToken, refresh, setToast }
 }
 
 function AdminPage({ data }: { data: CloudData }) {
-  return <FeaturePage title="Admin command center">
-    <section className="metrics">
-      <Stat icon={User} label="Users" value="RBAC" note="Admin policies ready" />
-      <Stat icon={BadgeCheck} label="Verifications" value={data.verifications.length} note="Pending workflow" />
-      <Stat icon={Sparkles} label="AI" value="metered" note="Usage events" />
-      <Stat icon={Target} label="Roadmap" value={data.roadmap.length} note="Public items" />
-    </section>
-    <section className="card panel">
-      <h3>Operational controls</h3>
-      <p>Admin tables and RLS foundations are ready for review queues, plan management, feedback triage, badge awards, support tickets, announcements, feature flags, audit logs, academy management, and analytics. Grant `support_admin`, `admin`, or `super_admin` in `profiles.role` to unlock policy-scoped operations.</p>
-    </section>
-  </FeaturePage>;
+  return <AdminControlCenter userId={data.profile.user_id || "unknown"} role={data.profile.role || "athlete"} />;
 }
 
 function OnboardingPage({ profile, saveProfile }: { profile: Profile; saveProfile: (values: Partial<Profile>) => Promise<void> }) {
