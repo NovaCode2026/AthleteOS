@@ -24,29 +24,53 @@ jobs:
           path = Path('src/App.tsx')
           text = path.read_text()
           pattern = r'function Dashboard\(\{ data, usage, openForm \}: \{ data: CloudData; usage: UsageSummary; openForm: \(resource: Resource\) => void \}\) \{.*?\n\}\n\nfunction PlansPage'
-          replacement = '''function Dashboard({ data, usage, openForm: _openForm }: { data: CloudData; usage: UsageSummary; openForm: (resource: Resource) => void }) {
+          replacement = '''function Dashboard({ data, usage, goToPage }: { data: CloudData; usage: UsageSummary; goToPage: (page: PageId) => void }) {
+            const openCard = (page: PageId) => goToPage(page);
+            const handleKey = (event: React.KeyboardEvent<HTMLElement>, page: PageId) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                openCard(page);
+              }
+            };
             return <>
               <AthleteCommandCenter data={data} />
-              <section className="dashboard-secondary">
-                <div className="grid two dashboard-secondary-grid">
-                  <section className="card panel dashboard-ai-usage">
+              <section className="dashboard-secondary" aria-label="Dashboard quick access">
+                <div className="dashboard-secondary-grid">
+                  <article
+                    className="card panel dashboard-ai-usage dashboard-click-card"
+                    role="link"
+                    tabIndex={0}
+                    aria-label="Open AI Coach"
+                    onClick={() => openCard("ai")}
+                    onKeyDown={(event) => handleKey(event, "ai")}
+                  >
                     <div className="section-heading"><div><span className="eyebrow">AI</span><h3>AI usage</h3></div><Sparkles size={18} /></div>
                     <Stat icon={Sparkles} label="AI usage" value={`${usage.used}/${usage.limit}`} note={usage.plan.name} />
-                  </section>
-                  <section className="card panel dashboard-weight-trend">
+                    <span className="dashboard-open-hint">Open AI Coach →</span>
+                  </article>
+
+                  <article
+                    className="card panel dashboard-weight-trend dashboard-click-card"
+                    role="link"
+                    tabIndex={0}
+                    aria-label="Open Weight tracking"
+                    onClick={() => openCard("weight")}
+                    onKeyDown={(event) => handleKey(event, "weight")}
+                  >
                     <div className="section-heading"><div><span className="eyebrow">Progress</span><h3>Weight trend</h3></div><Weight size={18} /></div>
                     <div className="dashboard-chart-wrap">
                       <ResponsiveContainer width="100%" height={260}>
-                        <LineChart data={data.weights} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
+                        <LineChart data={data.weights} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#25405f" />
                           <XAxis dataKey="logged_at" tick={{ fontSize: 11 }} minTickGap={20} />
-                          <YAxis width={42} />
+                          <YAxis width={42} domain={["auto", "auto"]} />
                           <Tooltip />
-                          <Line type="monotone" dataKey="weight_kg" stroke="#49d7ff" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                          <Line type="monotone" dataKey="weight_kg" stroke="#49d7ff" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 6 }} />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
-                  </section>
+                    <span className="dashboard-open-hint">Open Weight tracking →</span>
+                  </article>
                 </div>
               </section>
             </>;
@@ -56,30 +80,39 @@ jobs:
           new_text, count = re.subn(pattern, replacement, text, count=1, flags=re.S)
           if count != 1:
               raise SystemExit('Dashboard function pattern not found; refusing to modify source.')
+          new_text = new_text.replace(
+              '<Dashboard data={data} usage={usage} openForm={openForm} />',
+              '<Dashboard data={data} usage={usage} goToPage={setPage} />',
+              1,
+          )
           path.write_text(new_text)
 
-      - name: Add lower dashboard layout CSS
+      - name: Add clean lower dashboard CSS
         shell: bash
         run: |
           cat >> src/styles/main.css <<'EOF'
 
-/* Lower dashboard: keep only AI usage + weight trend, preserve command center above. */
-.dashboard-secondary, .dashboard-secondary-grid, .dashboard-secondary-grid > * { min-width: 0; }
-.dashboard-secondary { width: 100%; margin-top: 18px; }
-.dashboard-secondary-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; }
-.dashboard-ai-usage, .dashboard-weight-trend { min-width: 0; overflow: hidden; }
-.dashboard-ai-usage .metric { margin: 0; width: 100%; }
-.dashboard-chart-wrap { width: 100%; min-width: 0; overflow: hidden; }
-.dashboard-chart-wrap .recharts-responsive-container { max-width: 100%; min-width: 0 !important; }
-@media (max-width: 900px) {
-  .dashboard-secondary-grid { grid-template-columns: 1fr; }
-}
+/* ATHLETEOS_CLEAN_LOWER_DASHBOARD_V1 */
+.dashboard-secondary { width: 100%; min-width: 0; margin-top: 18px; }
+.dashboard-secondary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 17px; width: 100%; min-width: 0; }
+.dashboard-secondary-grid > * { min-width: 0; }
+.dashboard-click-card { min-width: 0; overflow: hidden; cursor: pointer; outline: none; transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease; }
+.dashboard-click-card:hover { transform: translateY(-2px); box-shadow: 0 14px 32px rgba(0,0,0,.24); border-color: rgba(73,215,255,.28); }
+.dashboard-click-card:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+.dashboard-ai-usage .metric { width: 100%; min-height: 104px; margin: 0; border: 0; background: transparent; box-shadow: none; }
+.dashboard-open-hint { display: block; margin: 4px 0 2px; color: #8ecfff; font-size: 11px; font-weight: 800; letter-spacing: .2px; }
+.dashboard-chart-wrap { width: 100%; min-width: 0; height: 260px; overflow: hidden; }
+.dashboard-chart-wrap .recharts-responsive-container { width: 100% !important; max-width: 100% !important; min-width: 0 !important; }
+.dashboard-chart-wrap .recharts-wrapper, .dashboard-chart-wrap .recharts-surface { max-width: 100%; }
+@media (max-width: 900px) { .dashboard-secondary-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) { .dashboard-secondary { margin-top: 14px; } .dashboard-secondary-grid { gap: 14px; } .dashboard-chart-wrap { height: 220px; } .dashboard-chart-wrap .recharts-responsive-container { height: 220px !important; } }
 EOF
 
       - name: Verify source and build
         run: |
           grep -n "function Dashboard" src/App.tsx
-          ! grep -q 'dashboard-secondary' /dev/null
+          grep -n "dashboard-click-card" src/App.tsx
+          grep -n 'goToPage={setPage}' src/App.tsx
           corepack enable
           pnpm install --frozen-lockfile
           pnpm run build
@@ -93,5 +126,5 @@ EOF
             echo 'No changes to commit.'
             exit 0
           fi
-          git commit -m 'fix: remove duplicate lower dashboard'
+          git commit -m 'fix: clean interactive lower dashboard cards'
           git push
