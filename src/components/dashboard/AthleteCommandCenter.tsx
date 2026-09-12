@@ -117,7 +117,7 @@ export default function AthleteCommandCenter({ data, onRefresh }: Props) {
       "student_verifications",
       "weight_logs",
       "medals",
-      "ai_usage"
+      "ai_usage_events"
     ];
     const channel = supabase.channel(`athlete-command-center-${userId}`);
     tables.forEach((table) => {
