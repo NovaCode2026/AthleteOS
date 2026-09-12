@@ -15,6 +15,11 @@ app = addImport(app, 'import AthleteCommandCenter from "./components/dashboard/A
 app = addImport(app, 'import AdminControlCenter from "./components/admin/AdminControlCenter";', 'import "./styles/main.css";');
 app = addImport(app, 'import MessagingPage from "./components/messaging/MessagingPage";', 'import "./styles/main.css";');
 
+const iconAnchor = '  Activity, BadgeCheck, Bell, Calendar, CheckCircle2, CreditCard, FileText, FolderLock,';
+if (app.includes(iconAnchor) && !app.includes('  MessageCircle,')) {
+  app = app.replace(iconAnchor, `${iconAnchor}\n  MessageCircle,`);
+}
+
 if (!app.includes("<AthleteCommandCenter")) {
   const dashboardStart = app.indexOf("function Dashboard(");
   if (dashboardStart < 0) throw new Error("Dashboard component not found; refusing unsafe rewrite");
@@ -46,11 +51,6 @@ if (!app.includes("<MessagingPage")) {
   if (!app.includes(routeAnchor)) throw new Error("Scanner route anchor not found; refusing unsafe rewrite");
   const messagingRoute = `${routeAnchor}\n  else if (page === "messages") content = <MessagingPage userId={auth.user?.id} role={data.profile.role} setToast={setToast} />;`;
   app = app.replace(routeAnchor, messagingRoute);
-}
-
-const iconAnchor = '  Activity, BadgeCheck, Bell, Calendar, CheckCircle2, CreditCard, FileText, FolderLock,';
-if (app.includes(iconAnchor) && !app.includes('MessageCircle')) {
-  app = app.replace(iconAnchor, '  Activity, BadgeCheck, Bell, Calendar, CheckCircle2, CreditCard, FileText, FolderLock,\n  MessageCircle,');
 }
 
 const cssMarker = "/* ATHLETEOS_LIVE_COMMAND_CENTER */";
