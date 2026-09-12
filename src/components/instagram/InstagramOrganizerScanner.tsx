@@ -1,13 +1,9 @@
 import { useEffect, useState } from "react";
 import { ExternalLink, Instagram, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
 
-type Props = {
-  accessToken?: string;
-  setToast: (toast: { type: "success" | "error" | "warning"; message: string } | null) => void;
-};
-
+type Props = { accessToken?: string; setToast: (toast: { type: "success" | "error" | "warning"; message: string } | null) => void };
 type Post = { id: string; caption?: string; media_type?: string; media_url?: string; permalink?: string; timestamp?: string };
-type ScanResult = { profile?: { username?: string; name?: string; biography?: string; profile_picture_url?: string; followers_count?: number }; posts?: Post[]; relevant_posts?: Post[] };
+type ScanResult = { organizer?: { username?: string; name?: string; biography?: string; profile_picture_url?: string; followers_count?: number }; posts?: Post[]; relevant_posts?: Post[] };
 
 function extractUsername(value: string) {
   const trimmed = value.trim().replace(/^@/, "");
@@ -51,9 +47,9 @@ export default function InstagramOrganizerScanner({ accessToken, setToast }: Pro
     setConnecting(true);
     try {
       const response = await fetch("/.netlify/functions/instagram-discovery-connect", { headers: { Authorization: `Bearer ${accessToken}` } });
-      const payload = await response.json().catch(() => ({})) as { authorizationUrl?: string; error?: string };
-      if (!response.ok || !payload.authorizationUrl) throw new Error(payload.error || "Instagram connection could not start.");
-      window.location.assign(payload.authorizationUrl);
+      const payload = await response.json().catch(() => ({})) as { authorizeUrl?: string; error?: string };
+      if (!response.ok || !payload.authorizeUrl) throw new Error(payload.error || "Instagram connection could not start.");
+      window.location.assign(payload.authorizeUrl);
     } catch (error) {
       setToast({ type: "error", message: error instanceof Error ? error.message : "Instagram connection could not start." });
       setConnecting(false);
@@ -67,9 +63,7 @@ export default function InstagramOrganizerScanner({ accessToken, setToast }: Pro
     if (!accessToken) return setToast({ type: "error", message: "Please sign in again before scanning." });
     setScanning(true);
     try {
-      const response = await fetch("/.netlify/functions/instagram-discovery-data", {
-        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ username })
-      });
+      const response = await fetch("/.netlify/functions/instagram-discovery-data", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ username }) });
       const payload = await response.json().catch(() => ({})) as ScanResult & { error?: string };
       if (!response.ok) throw new Error(payload.error || "Instagram organizer scan failed.");
       setResult(payload);
@@ -95,9 +89,9 @@ export default function InstagramOrganizerScanner({ accessToken, setToast }: Pro
       </div>
     </section>
     {scanning && <section className="card panel"><Loader2 className="spin" size={18} /> Reading public professional-account data...</section>}
-    {result?.profile && <section className="card panel"><div className="profile-grid">
-      {result.profile.profile_picture_url ? <img src={result.profile.profile_picture_url} alt="" className="avatar-lg" /> : <div className="avatar-lg">IG</div>}
-      <div><h3>@{result.profile.username}</h3><p>{result.profile.name || ""}</p><p>{result.profile.followers_count ? `${result.profile.followers_count.toLocaleString()} followers` : ""}</p><p>{result.profile.biography || "No bio returned."}</p></div>
+    {result?.organizer && <section className="card panel"><div className="profile-grid">
+      {result.organizer.profile_picture_url ? <img src={result.organizer.profile_picture_url} alt="" className="avatar-lg" /> : <div className="avatar-lg">IG</div>}
+      <div><h3>@{result.organizer.username}</h3><p>{result.organizer.name || ""}</p><p>{result.organizer.followers_count ? `${result.organizer.followers_count.toLocaleString()} followers` : ""}</p><p>{result.organizer.biography || "No bio returned."}</p></div>
     </div></section>}
     {result && <section className="card panel"><h3>Tournament-relevant posts ({relevant.length})</h3>
       {!relevant.length && <p>No tournament keywords were found in the returned recent posts.</p>}
