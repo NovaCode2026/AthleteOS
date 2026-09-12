@@ -2,19 +2,19 @@ import { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Activity, BadgeCheck, Bell, Calendar, CheckCircle2, CreditCard, FileText, FolderLock,
-  MessageCircle,
-  Download, ExternalLink, Gauge, HeartPulse, LogOut, Medal, Plus, RefreshCw, ScanLine, Shield,
+  MessageCircle, Download, ExternalLink, Gauge, HeartPulse, LogOut, Medal, Plus, RefreshCw, ScanLine, Shield,
   Sparkles, Star, Target, Trash2, Trophy, Upload, User, Weight
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
-import { isSupabaseConfigured, supabaseConfig } from "./lib/supabase";
+import { isSupabaseConfigured, supabase, supabaseConfig } from "./lib/supabase";
 import {
-  createSignedFileUrl, deletePrivateFile, deleteRow, insertRow, listRows, uploadPrivateFile, upsertRow, type Resource
+  createSignedFileUrl, deletePrivateFile, deleteRow, insertRow, listRows, updateRow, uploadPrivateFile, upsertRow, type Resource
 } from "./services/database";
 import { plans, getPlan } from "./config/plans";
+import { calculateReadiness } from "./utils/readiness";
 import type {
   ChecklistItem, CloudData, DocumentRecord, FeedbackItem, Goal, Medal as MedalRecord,
   AiUsageEvent, Profile, RoadmapItem, RoadmapVote, Subscription, SubscriptionUsage, TournamentScan, TrainingSession, Tournament, UsageSummary, VerificationRequest, WeightLog
@@ -60,6 +60,12 @@ function isPasswordResetRoute() {
 
 function isAuthCallbackRoute() {
   return window.location.pathname === "/auth/callback";
+}
+
+function pageFromPath(): PageId {
+  if (window.location.pathname === "/admin") return "admin";
+  if (window.location.pathname === "/messages") return "messages";
+  return "dashboard";
 }
 
 function sanitizeProfileValues(values: Partial<Profile>) {
@@ -180,6 +186,18 @@ function AuthScreen({ initialMode }: { initialMode?: AuthMode }) {
     }
   }
 
+  async function signInWithGoogle() {
+    setMessage("");
+    setBusy(true);
+    try {
+      await auth.signInWithGoogle();
+      setMessage("Redirecting to Google sign-in...");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Google sign-in could not be started.");
+      setBusy(false);
+    }
+  }
+
   if (!auth.configured) {
     const configurationIssues = supabaseConfig.missing.concat(supabaseConfig.invalid);
     return <main className="auth-page"><section className="auth-card">
@@ -194,6 +212,8 @@ function AuthScreen({ initialMode }: { initialMode?: AuthMode }) {
       <span className="eyebrow">Nova Code</span>
       <h1>AthleteOS - Taekwondo Edition</h1>
       <p>Secure cloud command center for training, tournaments, documents, medals, goals, verification, plans, and AI coaching.</p>
+      <button type="button" className="btn oauth-btn" onClick={() => void signInWithGoogle()} disabled={busy}>Continue with Google</button>
+      <div className="oauth-divider"><span>or use email</span></div>
       <form onSubmit={submit}>
         {mode === "register" && <Field label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />}
         {mode !== "reset" && <Field label="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />}
@@ -358,6 +378,7 @@ function safeHost(url: string) {
 
 function Dashboard({ data, usage, openForm }: { data: CloudData; usage: UsageSummary; openForm: (resource: Resource) => void }) {
   const latestWeight = data.weights.at(-1)?.weight_kg || data.profile.weight_kg || 0;
+  const readiness = calculateReadiness(data);
   return <>
     <AthleteCommandCenter data={data} />
     <section className="hero card">
@@ -367,7 +388,7 @@ function Dashboard({ data, usage, openForm }: { data: CloudData; usage: UsageSum
         <p>Cloud-backed athlete operating system with protected routes, Supabase RLS, plan limits, student verification, and server-side AI.</p>
         <div className="hero-actions"><button className="btn primary" onClick={() => openForm("training")}>Log training</button><button className="btn" onClick={() => openForm("tournaments")}>Add tournament</button></div>
       </div>
-      <div className="readiness"><strong>{Math.min(99, 70 + data.goals.length * 3)}%</strong><span>Readiness</span></div>
+      <div className="readiness"><strong>{readiness}%</strong><span>Readiness</span></div>
     </section>
     <section className="metrics">
       <Stat icon={Trophy} label="Tournaments" value={data.tournaments.length} note="Tracked events" />
@@ -504,15 +525,31 @@ function DocumentsPage({ rows, openForm, openDocument, removeDocument }: {
   </FeaturePage>;
 }
 
-function RoadmapPage({ rows, vote }: { rows: RoadmapItem[]; vote: (item: RoadmapItem) => Promise<void> }) {
-  return <FeaturePage title="Public roadmap">
+function RoadmapPage({
+  rows,
+  vote,
+  isAdmin,
+  openForm,
+  updateStatus,
+  removeItem
+}: {
+  rows: RoadmapItem[];
+  vote: (item: RoadmapItem) => Promise<void>;
+  isAdmin: boolean;
+  openForm: (resource: Resource) => void;
+  updateStatus: (item: RoadmapItem, status: string) => Promise<void>;
+  removeItem: (item: RoadmapItem) => Promise<void>;
+}) {
+  return <FeaturePage title="Public roadmap" actions={isAdmin ? <button className="btn primary" onClick={() => openForm("roadmap")}><Plus size={16} /> Add roadmap item</button> : undefined}>
     <section className="card panel">
-      <p>Votes are stored in Supabase. Each authenticated user can vote once per feature; totals are maintained by the database.</p>
+      <p>Votes are stored in Supabase. Each authenticated user can vote once per feature; totals are maintained by the database. Admin-only controls are protected by RLS.</p>
       <DataTable rows={rows} empty="Roadmap is being prepared" columns={[
         { key: "title", label: "Feature" },
-        { key: "status", label: "Status" },
+        { key: "status", label: "Status", render: (row) => isAdmin ? <select value={row.status || "planned"} onChange={(event) => void updateStatus(row, event.target.value)} aria-label={`Update ${row.title} status`}>
+          {["research", "planned", "in-progress", "released"].map((status) => <option key={status} value={status}>{status}</option>)}
+        </select> : row.status },
         { key: "votes", label: "Votes" },
-        { key: "vote", label: "", render: (row) => <button className="btn" disabled={row.user_has_voted} onClick={() => void vote(row)}>{row.user_has_voted ? "Voted" : "Vote"}</button> }
+        { key: "vote", label: "", render: (row) => <div className="inline-actions"><button className="btn" disabled={row.user_has_voted} onClick={() => void vote(row)}>{row.user_has_voted ? "Voted" : "Vote"}</button>{isAdmin && <button className="plain danger" onClick={() => void removeItem(row)}>Delete</button>}</div> }
       ]} />
     </section>
   </FeaturePage>;
@@ -586,6 +623,140 @@ function TournamentScannerPage({ scans, planId, accessToken, refresh, setToast }
   </FeaturePage>;
 }
 
+type InstagramOrganizerResult = {
+  organizer: {
+    id?: string | null;
+    username: string;
+    name?: string | null;
+    biography?: string | null;
+    profile_picture_url?: string | null;
+    followers_count?: number | null;
+  };
+  posts: Array<{
+    id: string;
+    caption?: string;
+    timestamp?: string | null;
+    permalink?: string | null;
+    media_type?: string | null;
+    media_url?: string | null;
+  }>;
+  relevant_posts: Array<{
+    id: string;
+    caption?: string;
+    timestamp?: string | null;
+    permalink?: string | null;
+    media_type?: string | null;
+    media_url?: string | null;
+  }>;
+  scanned_at: string;
+};
+
+function InstagramOrganizerScanner({ accessToken, setToast }: {
+  accessToken?: string;
+  setToast: (toast: ToastState) => void;
+}) {
+  const [input, setInput] = useState("");
+  const [connecting, setConnecting] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [result, setResult] = useState<InstagramOrganizerResult | null>(null);
+
+  async function connect() {
+    if (!accessToken) {
+      setToast({ type: "error", message: "Please sign in again before connecting Instagram." });
+      return;
+    }
+    setConnecting(true);
+    try {
+      const response = await fetch("/.netlify/functions/instagram-discovery-connect", {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      const payload = await response.json().catch(() => ({})) as { authorizeUrl?: string; error?: string };
+      if (!response.ok || !payload.authorizeUrl) throw new Error(payload.error || "Instagram connection could not be started.");
+      window.location.assign(payload.authorizeUrl);
+    } catch (error) {
+      setToast({ type: "error", message: error instanceof Error ? error.message : "Instagram connection could not be started." });
+      setConnecting(false);
+    }
+  }
+
+  async function scan(event: React.FormEvent) {
+    event.preventDefault();
+    if (!input.trim()) {
+      setToast({ type: "warning", message: "Enter an organizer's public Instagram username or profile URL." });
+      return;
+    }
+    if (!accessToken) {
+      setToast({ type: "error", message: "Please sign in again before scanning Instagram." });
+      return;
+    }
+    setScanning(true);
+    try {
+      const response = await fetch("/.netlify/functions/instagram-discovery-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ url: input })
+      });
+      const payload = await response.json().catch(() => ({})) as InstagramOrganizerResult & { error?: string };
+      if (!response.ok) throw new Error(payload.error || "Instagram organizer scan failed.");
+      setResult(payload);
+      setToast({ type: "success", message: `Scanned @${payload.organizer.username} without using AI.` });
+    } catch (error) {
+      setToast({ type: "error", message: error instanceof Error ? error.message : "Instagram organizer scan failed." });
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  return <FeaturePage title="Instagram Tournament Scanner">
+    <section className="card panel">
+      <div className="page-head">
+        <div>
+          <p className="eyebrow">Organizer discovery</p>
+          <h3>Scan public tournament announcements</h3>
+          <p>Connect a professional Instagram account, then paste an organizer's public Instagram username or profile URL. AthleteOS uses Meta Business Discovery and filters recent posts for tournament-related signals.</p>
+        </div>
+        <button className="btn" type="button" onClick={() => void connect()} disabled={connecting}>
+          {connecting ? "Connecting..." : "Connect Instagram"}
+        </button>
+      </div>
+      <form className="inline-form" onSubmit={(event) => { void scan(event); }}>
+        <input
+          type="text"
+          placeholder="@organizer or https://www.instagram.com/organizer/"
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          aria-label="Instagram organizer username or URL"
+        />
+        <button className="btn primary" disabled={scanning}>{scanning ? "Scanning..." : "Scan organizer"}</button>
+      </form>
+      <p className="notice" role="note">Only professional Instagram accounts that Meta exposes through Business Discovery can be scanned. Private or consumer accounts may not be available.</p>
+    </section>
+
+    {result && <section className="card panel">
+      <div className="page-head">
+        <div>
+          <p className="eyebrow">Scan result</p>
+          <h3>@{result.organizer.username}{result.organizer.name ? ` — ${result.organizer.name}` : ""}</h3>
+          {result.organizer.biography && <p>{result.organizer.biography}</p>}
+          {typeof result.organizer.followers_count === "number" && <small>{result.organizer.followers_count.toLocaleString()} followers</small>}
+        </div>
+        {result.organizer.profile_picture_url && <img src={result.organizer.profile_picture_url} alt="" width={64} height={64} style={{ borderRadius: "50%", objectFit: "cover" }} />}
+      </div>
+      <h4>Relevant tournament posts ({result.relevant_posts.length})</h4>
+      <DataTable
+        rows={result.relevant_posts}
+        empty="No tournament-related posts found in the recent media."
+        columns={[
+          { key: "timestamp", label: "Posted" },
+          { key: "caption", label: "Post" },
+          { key: "media_type", label: "Type" },
+          { key: "open", label: "", render: (post) => post.permalink ? <a href={post.permalink} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open</a> : null }
+        ]}
+      />
+    </section>}
+  </FeaturePage>;
+}
+
 function AdminPage({ data }: { data: CloudData }) {
   return <AdminControlCenter userId={data.profile.user_id || "unknown"} role={data.profile.role || "athlete"} />;
 }
@@ -634,16 +805,13 @@ function OnboardingPage({ profile, saveProfile }: { profile: Profile; saveProfil
 
 function AppShell() {
   const auth = useAuth();
-  const [page, setPage] = useState<PageId>("dashboard");
+  const userId = auth.user?.id;
+  const [page, setPage] = useState<PageId>(() => pageFromPath());
   const [toast, setToast] = useState<ToastState>(null);
   const { data, loading, refresh, hasProfile } = useCloudData(auth.user?.id, setToast);
   const [form, setForm] = useState<{ resource: Resource; values: Record<string, string | number | boolean> } | null>(null);
   const isAdmin = isAdminProfile(data.profile);
   const visibleNav = useMemo(() => nav.filter(([id]) => id !== "admin" || isAdmin), [isAdmin]);
-
-  useEffect(() => {
-    if (!loading && hasProfile && !isAdmin && page === "admin") setPage("dashboard");
-  }, [loading, hasProfile, isAdmin, page]);
 
   useEffect(() => {
     if (loading) return;
@@ -654,7 +822,50 @@ function AppShell() {
     }
   }, [loading, hasProfile]);
 
+  useEffect(() => {
+    const syncPath = () => setPage(pageFromPath());
+    window.addEventListener("popstate", syncPath);
+    return () => window.removeEventListener("popstate", syncPath);
+  }, []);
+
+  useEffect(() => {
+    const instagramState = new URLSearchParams(window.location.search).get("instagram");
+    if (instagramState === "discovery-connected") {
+      setToast({ type: "success", message: "Instagram organizer scanning is connected." });
+      window.history.replaceState(null, "", window.location.pathname);
+    } else if (instagramState === "connected") {
+      setToast({ type: "success", message: "Instagram account connected." });
+      window.history.replaceState(null, "", window.location.pathname);
+    } else if (instagramState === "error") {
+      setToast({ type: "error", message: "Instagram connection could not be completed." });
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!userId || !supabase || !isSupabaseConfigured) return undefined;
+    const channel = supabase
+      .channel(`athleteos-${userId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles", filter: `user_id=eq.${userId}` }, () => { void refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "training_sessions", filter: `user_id=eq.${userId}` }, () => { void refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "tournaments", filter: `user_id=eq.${userId}` }, () => { void refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "medals", filter: `user_id=eq.${userId}` }, () => { void refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "weight_logs", filter: `user_id=eq.${userId}` }, () => { void refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "goals", filter: `user_id=eq.${userId}` }, () => { void refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "documents", filter: `user_id=eq.${userId}` }, () => { void refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "feedback_items" }, () => { void refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "roadmap_items" }, () => { void refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "roadmap_votes" }, () => { void refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "tournament_scans", filter: `user_id=eq.${userId}` }, () => { void refresh(); })
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [userId]);
+
   const current = useMemo(() => visibleNav.find(([id]) => id === page), [page, visibleNav]);
+  const pageTitle = current?.[1] || (page === "admin" ? "Admin Panel" : "Dashboard");
   const activeSubscription = data.subscriptions.find((item) => ["active", "trialing"].includes(item.status));
   const plan = getPlan(activeSubscription?.plan_id || data.profile.plan_id);
   const usage: UsageSummary = { used: data.aiUsage.length, limit: plan.aiLimit, plan };
@@ -671,11 +882,13 @@ function AppShell() {
       if (resource === "weights" && (!values.logged_at || !values.weight_kg)) throw new Error("Weight date and value are required.");
       if (resource === "documents" && (!values.title || !values.document_type)) throw new Error("Document name and type are required.");
       if (resource === "feedback" && !values.title) throw new Error("Feedback title is required.");
+      if (resource === "roadmap" && (!isAdmin || !values.title)) throw new Error(isAdmin ? "Roadmap title is required." : "Admin access required.");
       if (resource === "profile") {
         const safeValues = sanitizeProfileValues(values as Partial<Profile>);
         await upsertRow("profile", { ...safeValues, user_id }, { onConflict: "user_id" });
       }
-      else await insertRow(resource, { ...values, user_id });
+      else if (resource === "roadmap") await insertRow(resource, values);
+      else await insertRow(resource, resource === "feedback" ? { ...values, visibility: values.visibility || "public", user_id } : { ...values, user_id });
       setToast({ type: "success", message: "Saved securely in Supabase." });
       setForm(null);
       try {
@@ -741,6 +954,34 @@ function AppShell() {
     }
   }
 
+  function navigate(id: PageId) {
+    setPage(id);
+    const path = id === "admin" ? "/admin" : id === "messages" ? "/messages" : "/";
+    window.history.pushState(null, "", path);
+  }
+
+  async function updateRoadmapStatus(item: RoadmapItem, status: string) {
+    if (!item.id || !isAdmin) return;
+    try {
+      await updateRow("roadmap", item.id, { status });
+      setToast({ type: "success", message: "Roadmap status updated." });
+      await refresh();
+    } catch (error) {
+      setToast({ type: "error", message: error instanceof Error ? error.message : "Roadmap status could not be updated." });
+    }
+  }
+
+  async function removeRoadmapItem(item: RoadmapItem) {
+    if (!item.id || !isAdmin) return;
+    try {
+      await deleteRow("roadmap", item.id);
+      setToast({ type: "success", message: "Roadmap item deleted." });
+      await refresh();
+    } catch (error) {
+      setToast({ type: "error", message: error instanceof Error ? error.message : "Roadmap item could not be deleted." });
+    }
+  }
+
   function openForm(resource: Resource) { setForm({ resource, values: {} }); }
 
   let content: React.ReactNode = null;
@@ -757,28 +998,42 @@ function AppShell() {
   else if (page === "weight") content = <FeaturePage title="Weight Tracker" actions={<button className="btn primary" onClick={() => openForm("weights")}><Plus size={16} /> Log</button>}><section className="card panel"><ResponsiveContainer width="100%" height={320}><LineChart data={data.weights}><CartesianGrid strokeDasharray="3 3" stroke="#25405f" /><XAxis dataKey="logged_at" /><YAxis /><Tooltip /><Line type="monotone" dataKey="weight_kg" stroke="#52ddac" strokeWidth={3} /></LineChart></ResponsiveContainer></section></FeaturePage>;
   else if (page === "calendar") content = <FeaturePage title="Calendar"><DataTable rows={data.training.map((item) => ({ ...item, event_type: "training" })).concat(data.tournaments.map((item) => ({ id: item.id, title: item.name, session_date: item.starts_at || "", event_type: "competition", minutes: 0 })))} empty="No calendar events" columns={[{ key: "title", label: "Event" }, { key: "session_date", label: "Date" }, { key: "event_type", label: "Type" }]} /></FeaturePage>;
   else if (page === "checklist") content = <FeaturePage title="Competition Checklist" actions={<button className="btn primary" onClick={() => openForm("checklist")}><Plus size={16} /> Add</button>}><section className="card checklist">{data.checklist.map((item) => <label key={item.id || item.item}><input type="checkbox" checked={Boolean(item.completed)} readOnly /> {item.item}<span>{item.category}</span></label>)}</section></FeaturePage>;
-  else if (page === "scanner") content = <TournamentScannerPage scans={data.tournamentScans} planId={plan.id} accessToken={auth.session?.access_token} refresh={refresh} setToast={setToast} />;
-  else if (page === "messages") content = <MessagingPage userId={auth.user?.id} role={data.profile.role} setToast={setToast} />;
+  else if (page === "scanner") content = <><TournamentScannerPage scans={data.tournamentScans} planId={plan.id} accessToken={auth.session?.access_token} refresh={refresh} setToast={setToast} /><InstagramOrganizerScanner accessToken={auth.session?.access_token} setToast={setToast} /></>;
   else if (page === "ai") content = <AiCoach usage={usage} accessToken={auth.session?.access_token} setToast={setToast} />;
   else if (page === "feedback") content = <FeaturePage title="Feedback portal" actions={<button className="btn primary" onClick={() => openForm("feedback")}><Plus size={16} /> Submit feedback</button>}><DataTable rows={data.feedback} empty="No feedback yet" columns={[{ key: "title", label: "Title" }, { key: "status", label: "Status" }, { key: "priority", label: "Priority" }]} /></FeaturePage>;
-  else if (page === "roadmap") content = <RoadmapPage rows={data.roadmap} vote={voteRoadmap} />;
-  else if (page === "admin") content = isAdmin ? <AdminPage data={data} /> : <FeaturePage title="Access denied"><section className="card panel"><h3>Admin access required</h3><p>Your account is not authorized to view admin operations.</p></section></FeaturePage>;
+  else if (page === "roadmap") content = <RoadmapPage rows={data.roadmap} vote={voteRoadmap} isAdmin={isAdmin} openForm={openForm} updateStatus={updateRoadmapStatus} removeItem={removeRoadmapItem} />;
+  else if (page === "messages") content = <MessagingPage />;
+  else if (page === "admin") content = isAdmin ? <AdminPage data={data} /> : <FeaturePage title="Access denied"><section className="card panel"><h3>Admin access required</h3><p>Your account is not authorized to view admin operations.</p><button className="btn" onClick={() => navigate("dashboard")}>Back to dashboard</button></section></FeaturePage>;
 
   return <div className="app-shell">
-    <aside className="sidebar"><div className="brand"><Shield /> <span>Athlete<span>OS</span></span></div><p className="edition">Taekwondo Edition V2</p><nav>{visibleNav.map(([id, label, Icon]) => <button key={id} className={id === page ? "active" : ""} onClick={() => setPage(id)}><Icon size={18} /> {label}</button>)}</nav><button className="logout" onClick={auth.signOut}><LogOut size={16} /> Logout</button></aside>
-    <main><header><div><p className="eyebrow">Nova Code Cloud</p><h1>{current?.[1] || "Dashboard"}</h1></div><button className="icon-btn" aria-label="Notifications"><Bell size={18} /></button></header>{!auth.emailVerified && <div className="card panel verify-banner"><BadgeCheck /><span>Please verify your email to unlock full account trust features.</span></div>}{content}<footer>Copyright © 2026 Nova Code</footer></main>
+    <aside className="sidebar"><div className="brand"><Shield /> <span>Athlete<span>OS</span></span></div><p className="edition">Taekwondo Edition V2</p><nav>{visibleNav.map(([id, label, Icon]) => <button key={id} className={id === page ? "active" : ""} onClick={() => navigate(id)}><Icon size={18} /> {label}</button>)}</nav><button className="logout" onClick={auth.signOut}><LogOut size={16} /> Logout</button></aside>
+    <main><header><div><p className="eyebrow">Nova Code Cloud</p><h1>{pageTitle}</h1></div><button className="icon-btn" aria-label="Notifications"><Bell size={18} /></button></header>{!auth.emailVerified && <div className="card panel verify-banner"><BadgeCheck /><span>Please verify your email to unlock full account trust features.</span></div>}{content}<footer>Copyright © 2026 Nova Code</footer></main>
     <Toast toast={toast} />
     {form && <RecordModal form={form} setForm={setForm} save={save} profile={data.profile} userId={auth.user?.id} />}
   </div>;
 }
 
-function RecordModal({ form, setForm, save, profile }: {
-  form: { resource: Resource };
-  setForm: (form: null) => void;
-  save: (resource: Resource, values: Record<string, string | number | boolean>) => Promise<void>;
+type RecordModalProps = {
+  form: {
+    resource: Resource;
+    values: Record<string, string | number | boolean>;
+  };
+  setForm: React.Dispatch<
+    React.SetStateAction<{
+      resource: Resource;
+      values: Record<string, string | number | boolean>;
+    } | null>
+  >;
+  save: (
+    resource: Resource,
+    values: Record<string, string | number | boolean>,
+    options?: { rethrow?: boolean }
+  ) => Promise<void>;
   profile: Profile;
   userId?: string;
-}) {
+};
+
+function RecordModal({ form, setForm, save, profile, userId }: RecordModalProps) {
   const [values, setValues] = useState<Record<string, string | number | boolean>>(form.resource === "profile" ? profile as Record<string, string | number | boolean> : {});
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
@@ -791,8 +1046,9 @@ function RecordModal({ form, setForm, save, profile }: {
     weights: [["logged_at", "Date", "date"], ["weight_kg", "Weight", "number"], ["target_weight_kg", "Target", "number"]],
     calendar: [["title", "Event"], ["event_date", "Date", "date"], ["event_type", "Type"], ["reminder_at", "Reminder", "datetime-local"]],
     checklist: [["item", "Item"], ["category", "Category"]],
-    feedback: [["title", "Title"], ["details", "Details"], ["priority", "Priority"]],
-    verifications: [["document_type", "Proof type", "select", ["school_id", "fee_receipt", "bonafide"]]]
+    feedback: [["title", "Title"], ["details", "Details"], ["priority", "Priority", "select", ["low", "normal", "high"]], ["visibility", "Visibility", "select", ["public", "private"]]],
+    roadmap: [["title", "Feature"], ["description", "Description"], ["status", "Status", "select", ["research", "planned", "in-progress", "released"]]],
+    verifications: [["document_type", "Proof type", "select", ["school_id", "fee_receipt", "bonafide"]], ["file_path", "Storage file path"], ["status", "Status", "select", ["pending", "approved", "rejected"]]]
   } as Partial<Record<Resource, Array<[string, string, string?, string[]?]>>>)[form.resource] || [];
 
   async function submit(event: React.FormEvent) {
@@ -800,15 +1056,11 @@ function RecordModal({ form, setForm, save, profile }: {
     setSaving(true);
     try {
       const payload = { ...values };
-      if (form.resource === "documents" || form.resource === "verifications") {
+      if (form.resource === "documents" && file) {
         if (!userId) throw new Error("Please sign in again before uploading.");
-        if (!file) throw new Error("Please choose a document to upload.");
-        if (file.size > 5 * 1024 * 1024) throw new Error("The selected file must be 5 MB or smaller.");
-        const extension = file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() : "bin";
-        const safeName = `${crypto.randomUUID()}.${extension || "bin"}`;
-        const bucket = form.resource === "verifications" ? "verification-proofs" : "documents";
-        payload.file_path = await uploadPrivateFile(bucket, `${userId}/${safeName}`, file);
-        if (form.resource === "verifications") payload.status = "pending";
+        const extension = file.name.includes(".") ? file.name.split(".").pop() : "bin";
+        const safeName = `${crypto.randomUUID()}.${extension}`;
+        payload.file_path = await uploadPrivateFile("documents", `${userId}/${safeName}`, file);
       }
       await save(form.resource, payload);
     } finally {
@@ -816,7 +1068,7 @@ function RecordModal({ form, setForm, save, profile }: {
     }
   }
 
-  return <div className="modal-backdrop"><form className="modal" onSubmit={(event) => { void submit(event); }}><button type="button" className="close" onClick={() => setForm(null)} aria-label="Close">x</button><h2>{form.resource}</h2>{fields.map(([name, label, type = "text", options]) => options ? <SelectField key={name} label={label} value={String(values[name] || "")} onChange={(event) => setValues({ ...values, [name]: event.target.value })}><option value="">Select</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</SelectField> : <Field key={name} label={label} type={type} value={String(values[name] || "")} onChange={(event) => setValues({ ...values, [name]: type === "number" ? Number(event.target.value) : event.target.value })} />)}{(form.resource === "documents" || form.resource === "verifications") && <label className="field"><span>Upload file (max 5 MB)</span><input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" required onChange={(event) => setFile(event.target.files?.[0] || null)} /></label>}<button className="btn primary" disabled={saving}>{saving ? "Saving..." : "Save"}</button></form></div>;
+  return <div className="modal-backdrop"><form className="modal" onSubmit={(event) => { void submit(event); }}><button type="button" className="close" onClick={() => setForm(null)} aria-label="Close">x</button><h2>{form.resource}</h2>{fields.map(([name, label, type = "text", options]) => options ? <SelectField key={name} label={label} value={String(values[name] || "")} onChange={(event) => setValues({ ...values, [name]: event.target.value })}><option value="">Select</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</SelectField> : <Field key={name} label={label} type={type} value={String(values[name] || "")} onChange={(event) => setValues({ ...values, [name]: type === "number" ? Number(event.target.value) : event.target.value })} />)}{form.resource === "documents" && <label className="field"><span>Upload file</span><input type="file" onChange={(event) => setFile(event.target.files?.[0] || null)} /></label>}<button className="btn primary" disabled={saving}>{saving ? "Saving..." : "Save"}</button></form></div>;
 }
 
 function ProtectedApp() {
