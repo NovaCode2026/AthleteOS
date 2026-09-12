@@ -50,3 +50,80 @@
     grid-template-columns: minmax(0, 1fr) !important;
   }
 }
+
+/* COMMAND CENTER BUTTON RESET
+   The live command-center controls are semantic buttons, but the original
+   command-center CSS did not reset native browser button chrome. Chromium was
+   therefore painting the gray translucent button surface over these controls. */
+.athlete-command-center .readiness-ring-button,
+.athlete-command-center .factor-button,
+.athlete-command-center .command-button,
+.athlete-command-center .timeline-button,
+.athlete-command-center .action-button {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  font: inherit !important;
+  opacity: 1 !important;
+  text-shadow: none !important;
+}
+
+.athlete-command-center .readiness-ring-button,
+.athlete-command-center .factor-button,
+.athlete-command-center .command-button,
+.athlete-command-center .timeline-button {
+  width: 100%;
+  text-align: left;
+}
+
+.athlete-command-center .readiness-ring-button {
+  cursor: pointer;
+  justify-content: flex-start;
+  padding: 14px 0;
+}
+
+.athlete-command-center .factor-button {
+  display: block;
+  cursor: pointer;
+  padding: 10px 0;
+  border-radius: 0 !important;
+}
+
+.athlete-command-center .command-button {
+  cursor: pointer;
+  border-radius: 0 !important;
+}
+
+.athlete-command-center .timeline-button {
+  cursor: pointer;
+  border-radius: 0 !important;
+}
+
+.athlete-command-center .action-button {
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  border-radius: 0 !important;
+  padding: 11px 0;
+}
+
+.athlete-command-center .readiness-ring-button:hover,
+.athlete-command-center .factor-button:hover,
+.athlete-command-center .command-button:hover,
+.athlete-command-center .timeline-button:hover,
+.athlete-command-center .action-button:hover {
+  background: rgba(73, 215, 255, 0.045) !important;
+}
+
+.athlete-command-center .readiness-ring-button:focus-visible,
+.athlete-command-center .factor-button:focus-visible,
+.athlete-command-center .command-button:focus-visible,
+.athlete-command-center .timeline-button:focus-visible,
+.athlete-command-center .action-button:focus-visible {
+  outline: 2px solid rgba(73, 215, 255, 0.8) !important;
+  outline-offset: 3px;
+}
