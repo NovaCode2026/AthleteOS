@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, Bell, Calendar, CheckCircle2, ChevronDown, ChevronUp, FileText, RefreshCw, Target, Trophy, Weight } from "lucide-react";
+import { Activity, Bell, Calendar, CheckCircle2, ChevronDown, ChevronUp, FileText, RefreshCw, Sparkles, Target, Trophy, Weight } from "lucide-react";
 import type { CloudData } from "../../types";
 import { calculateReadiness } from "../../lib/readiness";
+import { getPlan } from "../../config/plans";
 import { supabase } from "../../lib/supabase";
 import { listRows } from "../../services/database";
 import "../../styles/command-center.css";
@@ -48,6 +49,11 @@ export default function AthleteCommandCenter({ data, onRefresh }: Props) {
     .filter((t) => t.starts_at && new Date(t.starts_at).getTime() >= Date.now())
     .sort((a, b) => new Date(a.starts_at!).getTime() - new Date(b.starts_at!).getTime())[0];
   const pending = liveData.checklist.filter((x) => !x.completed && !(x as any).is_completed).slice(0, 3);
+  const aiPlan = getPlan(liveData.profile.plan_id || "free");
+  const aiUsed = liveData.aiUsage.length;
+  const aiLimit = aiPlan.aiLimit;
+  const aiRemaining = Math.max(0, aiLimit - aiUsed);
+  const aiPercent = aiLimit > 0 ? Math.min(100, Math.round((aiUsed / aiLimit) * 100)) : 0;
 
   useEffect(() => {
     setLiveData(data);
@@ -67,7 +73,7 @@ export default function AthleteCommandCenter({ data, onRefresh }: Props) {
       if (disposed) return;
       setLiveStatus("syncing");
       try {
-        const [profiles, tournaments, training, goals, checklist, documents, verifications, weights, medals] = await Promise.all([
+        const [profiles, tournaments, training, goals, checklist, documents, verifications, weights, medals, aiUsage] = await Promise.all([
           listRows<CloudData["profile"]>("profile", userId),
           listRows<CloudData["tournaments"][number]>("tournaments", userId, { order: "starts_at", ascending: true }),
           listRows<CloudData["training"][number]>("training", userId, { order: "session_date", ascending: false }),
@@ -76,7 +82,8 @@ export default function AthleteCommandCenter({ data, onRefresh }: Props) {
           listRows<CloudData["documents"][number]>("documents", userId, { order: "created_at" }),
           listRows<CloudData["verifications"][number]>("verifications", userId, { order: "created_at" }),
           listRows<CloudData["weights"][number]>("weights", userId, { order: "logged_at", ascending: true }),
-          listRows<CloudData["medals"][number]>("medals", userId, { order: "awarded_at", ascending: false })
+          listRows<CloudData["medals"][number]>("medals", userId, { order: "awarded_at", ascending: false }),
+          listRows<CloudData["aiUsage"][number]>("aiUsage", userId, { order: "created_at", ascending: false })
         ]);
 
         if (disposed) return;
@@ -90,7 +97,8 @@ export default function AthleteCommandCenter({ data, onRefresh }: Props) {
           documents,
           verifications,
           weights,
-          medals
+          medals,
+          aiUsage
         }));
         setUpdatedAt(new Date());
         setLiveStatus("live");
@@ -108,7 +116,8 @@ export default function AthleteCommandCenter({ data, onRefresh }: Props) {
       "documents",
       "student_verifications",
       "weight_logs",
-      "medals"
+      "medals",
+      "ai_usage"
     ];
     const channel = supabase.channel(`athlete-command-center-${userId}`);
     tables.forEach((table) => {
@@ -185,6 +194,20 @@ export default function AthleteCommandCenter({ data, onRefresh }: Props) {
           </div>
         </div>
       </article>
+    </section>
+
+    <section className="ai-usage-section">
+      <button type="button" className="card ai-usage-card" onClick={() => toggle("ai-usage")} aria-expanded={expanded === "ai-usage"}>
+        <span className="ai-usage-icon"><Sparkles size={19} /></span>
+        <span className="ai-usage-copy">
+          <span className="eyebrow">AI usage</span>
+          <strong>{aiUsed}/{aiLimit}</strong>
+          <small>{aiPlan.name} plan · {aiRemaining} remaining</small>
+          <i className="ai-usage-bar"><em style={{ width: `${aiPercent}%` }} /></i>
+        </span>
+        <span className="ai-usage-open">{expanded === "ai-usage" ? "Close ↑" : "View AI Coach →"}</span>
+      </button>
+      {expanded === "ai-usage" && <div className="card ai-usage-details"><strong>AI Coach usage</strong><p>{aiUsed} AI requests recorded this period. Your {aiPlan.name} plan includes {aiLimit} requests. Usage refreshes live when new AI activity is recorded.</p></div>}
     </section>
 
     <section className="interactive-grid">
