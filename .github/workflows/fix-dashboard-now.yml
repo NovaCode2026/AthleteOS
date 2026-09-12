@@ -1,0 +1,97 @@
+name: Fix lower dashboard
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Replace duplicate lower dashboard
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          path = Path('src/App.tsx')
+          text = path.read_text()
+          pattern = r'function Dashboard\(\{ data, usage, openForm \}: \{ data: CloudData; usage: UsageSummary; openForm: \(resource: Resource\) => void \}\) \{.*?\n\}\n\nfunction PlansPage'
+          replacement = '''function Dashboard({ data, usage, openForm: _openForm }: { data: CloudData; usage: UsageSummary; openForm: (resource: Resource) => void }) {
+            return <>
+              <AthleteCommandCenter data={data} />
+              <section className="dashboard-secondary">
+                <div className="grid two dashboard-secondary-grid">
+                  <section className="card panel dashboard-ai-usage">
+                    <div className="section-heading"><div><span className="eyebrow">AI</span><h3>AI usage</h3></div><Sparkles size={18} /></div>
+                    <Stat icon={Sparkles} label="AI usage" value={`${usage.used}/${usage.limit}`} note={usage.plan.name} />
+                  </section>
+                  <section className="card panel dashboard-weight-trend">
+                    <div className="section-heading"><div><span className="eyebrow">Progress</span><h3>Weight trend</h3></div><Weight size={18} /></div>
+                    <div className="dashboard-chart-wrap">
+                      <ResponsiveContainer width="100%" height={260}>
+                        <LineChart data={data.weights} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#25405f" />
+                          <XAxis dataKey="logged_at" tick={{ fontSize: 11 }} minTickGap={20} />
+                          <YAxis width={42} />
+                          <Tooltip />
+                          <Line type="monotone" dataKey="weight_kg" stroke="#49d7ff" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </section>
+                </div>
+              </section>
+            </>;
+          }
+
+          function PlansPage'''
+          new_text, count = re.subn(pattern, replacement, text, count=1, flags=re.S)
+          if count != 1:
+              raise SystemExit('Dashboard function pattern not found; refusing to modify source.')
+          path.write_text(new_text)
+
+      - name: Add lower dashboard layout CSS
+        shell: bash
+        run: |
+          cat >> src/styles/main.css <<'EOF'
+
+/* Lower dashboard: keep only AI usage + weight trend, preserve command center above. */
+.dashboard-secondary, .dashboard-secondary-grid, .dashboard-secondary-grid > * { min-width: 0; }
+.dashboard-secondary { width: 100%; margin-top: 18px; }
+.dashboard-secondary-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; }
+.dashboard-ai-usage, .dashboard-weight-trend { min-width: 0; overflow: hidden; }
+.dashboard-ai-usage .metric { margin: 0; width: 100%; }
+.dashboard-chart-wrap { width: 100%; min-width: 0; overflow: hidden; }
+.dashboard-chart-wrap .recharts-responsive-container { max-width: 100%; min-width: 0 !important; }
+@media (max-width: 900px) {
+  .dashboard-secondary-grid { grid-template-columns: 1fr; }
+}
+EOF
+
+      - name: Verify source and build
+        run: |
+          grep -n "function Dashboard" src/App.tsx
+          ! grep -q 'dashboard-secondary' /dev/null
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm run build
+
+      - name: Commit fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/App.tsx src/styles/main.css
+          if git diff --cached --quiet; then
+            echo 'No changes to commit.'
+            exit 0
+          fi
+          git commit -m 'fix: remove duplicate lower dashboard'
+          git push
