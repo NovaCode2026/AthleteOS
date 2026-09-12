@@ -9,6 +9,9 @@ const planIntervals = {
   academy: 0.5
 };
 
+const maxDiscoveredPages = 12;
+const relevantLinkPattern = /(tournament|championship|open|notice|circular|announcement|schedule|result|fixture|draw|weigh|registration|entry|pdf)/i;
+
 function json(payload, status = 200) {
   return Response.json(payload, { status });
 }
@@ -68,6 +71,40 @@ function extractPdfLinks(html, baseUrl) {
   return links.slice(0, 20);
 }
 
+function extractRelevantLinks(html, baseUrl) {
+  const links = [];
+  const pattern = /<a[^>]+href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  for (const match of html.matchAll(pattern)) {
+    try {
+      const url = new URL(match[1], baseUrl);
+      if (!["http:", "https:"].includes(url.protocol)) continue;
+      if (url.origin !== new URL(baseUrl).origin) continue;
+      const label = normalizeText(match[2]).slice(0, 160);
+      if (!relevantLinkPattern.test(`${url.pathname} ${label}`)) continue;
+      url.hash = "";
+      links.push(url.toString());
+    } catch {
+      // Ignore malformed or cross-origin links.
+    }
+  }
+  return [...new Set(links)];
+}
+
+function extractSitemapLinks(xml, baseUrl) {
+  const links = [];
+  for (const match of xml.matchAll(/<loc>\s*([^<]+)\s*<\/loc>/gi)) {
+    try {
+      const url = new URL(match[1].trim(), baseUrl);
+      if (["http:", "https:"].includes(url.protocol) && url.origin === new URL(baseUrl).origin) {
+        if (relevantLinkPattern.test(`${url.pathname} ${url.search}`)) links.push(url.toString());
+      }
+    } catch {
+      // Ignore malformed sitemap entries.
+    }
+  }
+  return [...new Set(links)];
+}
+
 function scanPage(html, sourceUrl) {
   const text = normalizeText(html);
   const title = firstMatch(html, [/<title[^>]*>([\s\S]*?)<\/title>/i]) || firstMatch(text, [
@@ -88,6 +125,69 @@ function scanPage(html, sourceUrl) {
     notices: firstMatch(text, [/(?:notice|important)\s*[:\-]\s*([^.;]{4,260})/i]),
     schedules_results: firstMatch(text, [/(?:schedule|results?)\s*[:\-]\s*([^.;]{4,260})/i]),
     pdfs: extractPdfLinks(html, sourceUrl)
+  };
+}
+
+async function fetchText(url) {
+  const response = await fetch(url, {
+    headers: { "User-Agent": "AthleteOS-TournamentScanner/1.0" }
+  });
+  if (!response.ok) throw new Error(`HTTP_${response.status}`);
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.includes("text/html") && !contentType.includes("text/plain") && !contentType.includes("xml")) {
+    throw new Error("UNSUPPORTED_CONTENT");
+  }
+  return response.text();
+}
+
+async function scanSource(sourceUrl) {
+  const rootHtml = await fetchText(sourceUrl);
+  const parsedSource = new URL(sourceUrl);
+  const discovered = new Set([parsedSource.toString()]);
+
+  for (const link of extractRelevantLinks(rootHtml, sourceUrl)) {
+    if (discovered.size >= maxDiscoveredPages) break;
+    discovered.add(link);
+  }
+
+  // A sitemap catches newly published notice pages even when the homepage itself is unchanged.
+  try {
+    const sitemapUrl = new URL("/sitemap.xml", sourceUrl).toString();
+    const sitemap = await fetchText(sitemapUrl);
+    for (const link of extractSitemapLinks(sitemap, sourceUrl)) {
+      if (discovered.size >= maxDiscoveredPages) break;
+      discovered.add(link);
+    }
+  } catch {
+    // Sitemap is optional.
+  }
+
+  const pages = [];
+  for (const url of discovered) {
+    try {
+      const html = url === parsedSource.toString() ? rootHtml : await fetchText(url);
+      pages.push({ url, html, extracted: scanPage(html, url) });
+    } catch {
+      // One blocked child page should not invalidate the whole source.
+    }
+  }
+
+  if (!pages.length) throw new Error("SOURCE_UNAVAILABLE");
+
+  const primary = pages[0].extracted;
+  const allPdfs = pages.flatMap((page) => page.extracted.pdfs || []);
+  const uniquePdfs = [...new Map(allPdfs.map((pdf) => [pdf.href, pdf])).values()].slice(0, 20);
+  const allText = pages.map((page) => `${page.url}\n${normalizeText(page.html)}`).join("\n");
+  const discoveredUrls = [...discovered].sort().join("\n");
+
+  return {
+    extracted: {
+      ...primary,
+      pdfs: uniquePdfs
+    },
+    source_hash: createHash("sha256").update(`${discoveredUrls}\n${allText}`).digest("hex"),
+    pages_scanned: pages.length,
+    discovered_urls: [...discovered]
   };
 }
 
@@ -155,30 +255,23 @@ export default async function handler(request) {
     }
   }
 
-  let html = "";
   let status = "checked";
   let extracted = {};
+  let sourceHash;
   try {
-    const response = await fetch(parsedUrl, {
-      headers: { "User-Agent": "AthleteOS-TournamentScanner/1.0" }
-    });
-    if (!response.ok) throw new Error(`HTTP_${response.status}`);
-    const contentType = response.headers.get("content-type") || "";
-    if (!contentType.includes("text/html") && !contentType.includes("text/plain")) {
-      throw new Error("UNSUPPORTED_CONTENT");
-    }
-    html = await response.text();
-    extracted = scanPage(html, parsedUrl.toString());
+    const result = await scanSource(parsedUrl.toString());
+    extracted = result.extracted;
+    sourceHash = result.source_hash;
   } catch {
     status = "blocked";
+    sourceHash = createHash("sha256").update(`${parsedUrl}:${Date.now()}`).digest("hex");
     extracted = {
-      notices: "AthleteOS could not scan this source automatically. The site may block server requests or use an unsupported file type. Open the source directly or upload the PDF/notice as a document."
+      notices: "AthleteOS could not scan this source automatically. The site may block server requests, require JavaScript, or use an unsupported file type."
     };
   }
 
-  const sourceHash = createHash("sha256").update(html || `${parsedUrl}:${Date.now()}`).digest("hex");
   const changed = existing?.source_hash && existing.source_hash !== sourceHash
-    ? "Source content changed since the previous check."
+    ? "Source or a discovered tournament page changed since the previous check."
     : "No previous change detected.";
 
   const { data, error } = await supabase
