@@ -44,6 +44,24 @@ async function exchangeCode(code, redirectUri) {
   return payload;
 }
 
+async function exchangeForLongLivedToken(shortLivedToken) {
+  const appSecret = process.env.INSTAGRAM_APP_SECRET;
+  if (!appSecret) throw new Error("INSTAGRAM_SERVER_CONFIG_MISSING");
+
+  const url = new URL("https://graph.instagram.com/access_token");
+  url.searchParams.set("grant_type", "ig_exchange_token");
+  url.searchParams.set("client_secret", appSecret);
+  url.searchParams.set("access_token", shortLivedToken);
+
+  const response = await fetch(url);
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload.access_token) {
+    console.error("Instagram long-lived token exchange failed", response.status, payload);
+    throw new Error("INSTAGRAM_LONG_LIVED_TOKEN_EXCHANGE_FAILED");
+  }
+  return payload;
+}
+
 async function getInstagramProfile(accessToken) {
   const url = new URL("https://graph.instagram.com/me");
   url.searchParams.set("fields", "user_id,username");
@@ -87,26 +105,34 @@ export default async function handler(request) {
       return redirect("/", { instagram: "error", reason: "invalid_state" });
     }
 
-    // Consume the one-time state before exchanging the code so it cannot be replayed.
     await supabase.from("instagram_oauth_states").delete().eq("state", state);
 
-    const token = await exchangeCode(code, redirectUri);
-    const profile = await getInstagramProfile(token.access_token);
+    const shortToken = await exchangeCode(code, redirectUri);
+    const longToken = await exchangeForLongLivedToken(shortToken.access_token);
+    const profile = await getInstagramProfile(longToken.access_token);
 
     const username = profile.username || null;
-    const instagramUserId = String(profile.user_id || token.user_id);
-    const scopes = Array.isArray(token.permissions) ? token.permissions : [];
+    const instagramUserId = String(profile.user_id || shortToken.user_id);
+    const scopes = Array.isArray(shortToken.permissions)
+      ? shortToken.permissions
+      : [
+          "instagram_business_basic",
+          "instagram_business_manage_comments",
+          "instagram_business_manage_messages"
+        ];
 
+    const expiresIn = Number(longToken.expires_in) || 60 * 24 * 60 * 60;
+    const now = new Date();
     const { error: saveError } = await supabase.from("instagram_connections").upsert({
       user_id: oauthState.user_id,
       instagram_user_id: instagramUserId,
       username,
-      access_token: token.access_token,
-      token_expires_at: token.expires_in ? new Date(Date.now() + Number(token.expires_in) * 1000).toISOString() : null,
+      access_token: longToken.access_token,
+      token_expires_at: new Date(now.getTime() + expiresIn * 1000).toISOString(),
       scopes,
       status: "active",
-      connected_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      connected_at: now.toISOString(),
+      updated_at: now.toISOString()
     }, { onConflict: "user_id" });
 
     if (saveError) {
