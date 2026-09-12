@@ -1,0 +1,48 @@
+/* Dashboard lower-section fix: preserve the interactive command center above. */
+.app-shell main > .hero.card,
+.app-shell main > .metrics {
+  display: none !important;
+}
+
+/* Keep only the old lower AI usage tracker and remove the duplicate goals panel. */
+.app-shell main > .grid.two > .panel:nth-child(2) {
+  display: none !important;
+}
+
+.app-shell main > .grid.two {
+  grid-template-columns: minmax(0, 1fr) !important;
+  min-width: 0;
+}
+
+.app-shell main > .grid.two > .panel {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.app-shell main > .metrics {
+  grid-template-columns: minmax(0, 1fr) !important;
+  min-width: 0;
+}
+
+.dashboard-secondary,
+.dashboard-secondary-grid,
+.dashboard-secondary-grid > * {
+  min-width: 0;
+}
+
+.dashboard-chart-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.dashboard-chart-wrap .recharts-responsive-container {
+  max-width: 100%;
+  min-width: 0 !important;
+}
+
+@media (max-width: 900px) {
+  .app-shell main > .grid.two {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
