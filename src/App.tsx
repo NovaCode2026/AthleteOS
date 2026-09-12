@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Activity, BadgeCheck, Bell, Calendar, CheckCircle2, CreditCard, FileText, FolderLock,
+  MessageCircle,
   Download, ExternalLink, Gauge, HeartPulse, LogOut, Medal, Plus, RefreshCw, ScanLine, Shield,
   Sparkles, Star, Target, Trash2, Trophy, Upload, User, Weight
 } from "lucide-react";
@@ -20,9 +21,10 @@ import type {
 } from "./types";
 import AthleteCommandCenter from "./components/dashboard/AthleteCommandCenter";
 import AdminControlCenter from "./components/admin/AdminControlCenter";
+import MessagingPage from "./components/messaging/MessagingPage";
 import "./styles/main.css";
 
-type PageId = "dashboard" | "profile" | "plans" | "verification" | "tournaments" | "training" | "medals" | "documents" | "weight" | "calendar" | "checklist" | "scanner" | "ai" | "feedback" | "roadmap" | "admin";
+type PageId = "dashboard" | "profile" | "plans" | "verification" | "tournaments" | "training" | "medals" | "documents" | "weight" | "calendar" | "checklist" | "scanner" | "ai" | "feedback" | "roadmap" | "messages" | "admin";
 type ToastState = { type: "success" | "error" | "warning"; message: string } | null;
 type AdminRole = "support_admin" | "admin" | "super_admin";
 type AuthMode = "login" | "register" | "forgot" | "reset";
@@ -31,6 +33,7 @@ const adminRoles = new Set<AdminRole>(["support_admin", "admin", "super_admin"])
 
 const nav: Array<[PageId, string, typeof Activity]> = [
   ["dashboard", "Dashboard", Activity],
+  ["messages", "Messages", MessageCircle],
   ["profile", "Profile", User],
   ["plans", "Plans", CreditCard],
   ["verification", "Verification", BadgeCheck],
@@ -755,6 +758,7 @@ function AppShell() {
   else if (page === "calendar") content = <FeaturePage title="Calendar"><DataTable rows={data.training.map((item) => ({ ...item, event_type: "training" })).concat(data.tournaments.map((item) => ({ id: item.id, title: item.name, session_date: item.starts_at || "", event_type: "competition", minutes: 0 })))} empty="No calendar events" columns={[{ key: "title", label: "Event" }, { key: "session_date", label: "Date" }, { key: "event_type", label: "Type" }]} /></FeaturePage>;
   else if (page === "checklist") content = <FeaturePage title="Competition Checklist" actions={<button className="btn primary" onClick={() => openForm("checklist")}><Plus size={16} /> Add</button>}><section className="card checklist">{data.checklist.map((item) => <label key={item.id || item.item}><input type="checkbox" checked={Boolean(item.completed)} readOnly /> {item.item}<span>{item.category}</span></label>)}</section></FeaturePage>;
   else if (page === "scanner") content = <TournamentScannerPage scans={data.tournamentScans} planId={plan.id} accessToken={auth.session?.access_token} refresh={refresh} setToast={setToast} />;
+  else if (page === "messages") content = <MessagingPage userId={auth.user?.id} role={data.profile.role} setToast={setToast} />;
   else if (page === "ai") content = <AiCoach usage={usage} accessToken={auth.session?.access_token} setToast={setToast} />;
   else if (page === "feedback") content = <FeaturePage title="Feedback portal" actions={<button className="btn primary" onClick={() => openForm("feedback")}><Plus size={16} /> Submit feedback</button>}><DataTable rows={data.feedback} empty="No feedback yet" columns={[{ key: "title", label: "Title" }, { key: "status", label: "Status" }, { key: "priority", label: "Priority" }]} /></FeaturePage>;
   else if (page === "roadmap") content = <RoadmapPage rows={data.roadmap} vote={voteRoadmap} />;
